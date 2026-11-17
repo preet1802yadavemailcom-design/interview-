@@ -14,6 +14,7 @@ export class InterviewRecorder {
   private recorder: MediaRecorder | null = null
   private chunks: Blob[] = []
   private audioContext: AudioContext | null = null
+  private compressor: DynamicsCompressorNode | null = null
   private animationFrame = 0
   private canvasStream: MediaStream | null = null
   private mixedAudioStream: MediaStream | null = null
@@ -38,6 +39,7 @@ export class InterviewRecorder {
     isLocalCameraOn: () => boolean = () => true,
     isRemoteCameraOn: () => boolean = () => true,
     localFilterCss = 'none',
+    isRemoteScreenSharing: () => boolean = () => false,
   ) {
     if (!localStream.getVideoTracks().length && !remoteStream.getVideoTracks().length) {
       throw new Error('At least one video track is required to start recording.')
@@ -68,6 +70,7 @@ export class InterviewRecorder {
       compressor.attack.value = 0.003
       compressor.release.value = 0.25
       compressor.connect(destination)
+      this.compressor = compressor
 
       const addAudioSource = (stream: MediaStream, gainValue = 0.85) => {
         const liveTracks = stream.getAudioTracks().filter(t => t.readyState === 'live')
@@ -220,12 +223,14 @@ export class InterviewRecorder {
         context.fillStyle = '#060a15'
         context.fillRect(0, 0, 1920, 1080)
 
-        const currentScreen = this.screenVideo
+        const isRemoteSharing = isRemoteScreenSharing()
+        const isAnyScreenActive = (this.hasScreen && Boolean(this.screenVideo)) || isRemoteSharing
+        const currentScreen = this.hasScreen ? this.screenVideo : (isRemoteSharing ? remoteVideo : null)
         const screenReady =
-          this.hasScreen &&
-          currentScreen &&
-          currentScreen.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-          currentScreen.videoWidth > 0
+          isAnyScreenActive &&
+          Boolean(currentScreen) &&
+          currentScreen!.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+          currentScreen!.videoWidth > 0
 
         if (screenReady && currentScreen) {
           // Screen Share as Main Stage + PiP tiles in bottom right
@@ -244,18 +249,25 @@ export class InterviewRecorder {
           context.fillStyle = grad
           context.fillRect(0, 680, 1920, 400)
 
-          const pipW = 400
-          const pipH = 225
-          const gap = 20
-          const pipY = 820
-          const x1 = 1920 - (pipW * 2 + gap) - 36
-          const x2 = x1 + pipW + gap
+          const pipW = 380
+          const pipH = 214
+          const pipY = 830
 
-          drawRoundedVideo(localVideo, localName || 'Interviewer', x1, pipY, pipW, pipH, isLocalCameraOn(), true, localFilterCss)
-          drawRoundedVideo(remoteVideo, remoteName || 'Participant', x2, pipY, pipW, pipH, isRemoteCameraOn(), false, 'none')
-
-          drawName(localName || 'Interviewer', x1, pipY + pipH - 52, pipW)
-          drawName(remoteName || 'Participant', x2, pipY + pipH - 52, pipW)
+          if (this.hasScreen) {
+            // Local is sharing: draw both webcam PiPs
+            const gap = 16
+            const x1 = 1920 - (pipW * 2 + gap) - 36
+            const x2 = x1 + pipW + gap
+            drawRoundedVideo(localVideo, localName || 'Interviewer', x1, pipY, pipW, pipH, isLocalCameraOn(), true, localFilterCss)
+            drawRoundedVideo(remoteVideo, remoteName || 'Participant', x2, pipY, pipW, pipH, isRemoteCameraOn(), false, 'none')
+            drawName(localName || 'Interviewer', x1, pipY + pipH - 52, pipW)
+            drawName(remoteName || 'Participant', x2, pipY + pipH - 52, pipW)
+          } else {
+            // Remote is sharing screen: remoteVideo is the screen, show local interviewer in PiP
+            const x = 1920 - pipW - 36
+            drawRoundedVideo(localVideo, localName || 'Interviewer', x, pipY, pipW, pipH, isLocalCameraOn(), true, localFilterCss)
+            drawName(localName || 'Interviewer', x, pipY + pipH - 52, pipW)
+          }
         } else {
           // Standard Side-by-Side Layout
           const pad = 36
@@ -405,6 +417,61 @@ export class InterviewRecorder {
     return this.recorder?.state === 'paused'
   }
 
+  updateScreenStream(screenStream: MediaStream | null) {
+    this.screenStream = screenStream
+    this.hasScreen = Boolean(screenStream?.getVideoTracks().length)
+    if (this.hasScreen && screenStream) {
+      this.screenWasSelected = true
+      this.screenHasAudio = Boolean(screenStream.getAudioTracks().length)
+
+      if (this.screenVideo) {
+        this.screenVideo.pause()
+        this.screenVideo.srcObject = null
+      }
+      this.screenVideo = document.createElement('video')
+      this.screenVideo.srcObject = screenStream
+      this.screenVideo.muted = true
+      this.screenVideo.playsInline = true
+      void this.screenVideo.play().catch(() => undefined)
+
+      if (this.audioContext && this.compressor && this.screenHasAudio) {
+        try {
+          const liveTracks = screenStream.getAudioTracks().filter(t => t.readyState === 'live')
+          if (liveTracks.length) {
+            const source = this.audioContext.createMediaStreamSource(new MediaStream(liveTracks))
+            const gain = this.audioContext.createGain()
+            gain.gain.value = 0.70
+            source.connect(gain).connect(this.compressor)
+          }
+        } catch (e) {
+          console.warn('[Recorder] Screen audio source hook warning:', e)
+        }
+      }
+
+      const videoTrack = screenStream.getVideoTracks()[0]
+      if (videoTrack) {
+        videoTrack.addEventListener(
+          'ended',
+          () => {
+            this.hasScreen = false
+            if (this.screenVideo) {
+              this.screenVideo.pause()
+              this.screenVideo.srcObject = null
+            }
+          },
+          { once: true },
+        )
+      }
+    } else {
+      if (this.screenVideo) {
+        this.screenVideo.pause()
+        this.screenVideo.srcObject = null
+        this.screenVideo = null
+      }
+      this.hasScreen = false
+    }
+  }
+
   private cleanup() {
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame)
@@ -437,6 +504,7 @@ export class InterviewRecorder {
       this.audioContext = null
     }
 
+    this.compressor = null
     this.hasScreen = false
     this.screenWasSelected = false
     this.screenHasAudio = false

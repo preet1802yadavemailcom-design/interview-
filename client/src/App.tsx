@@ -72,6 +72,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null)
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false)
   const [remoteScreenSharerName, setRemoteScreenSharerName] = useState('')
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
@@ -107,18 +108,25 @@ export default function App() {
   const cameraOnRef = useRef(true)
   cameraOnRef.current = cameraOn
 
+  const isRemoteScreenSharingRef = useRef(false)
+  isRemoteScreenSharingRef.current = isRemoteScreenSharing
+
   // Manage video stream element assignment when entering meeting
   useEffect(() => {
     if (view === 'meeting') {
-      if (localVideoRef.current && localStreamRef.current) {
+      if (localVideoRef.current && localStreamRef.current && localVideoRef.current.srcObject !== localStreamRef.current) {
         localVideoRef.current.srcObject = localStreamRef.current
       }
-      if (remoteVideoRef.current && remoteStreamRef.current) {
+      if (remoteVideoRef.current && remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
         remoteVideoRef.current.srcObject = remoteStreamRef.current
         void remoteVideoRef.current.play().catch(() => setAudioPlaybackBlocked(true))
       }
+      if (screenVideoRef.current && screenStreamRef.current && screenVideoRef.current.srcObject !== screenStreamRef.current) {
+        screenVideoRef.current.srcObject = screenStreamRef.current
+        void screenVideoRef.current.play().catch(() => undefined)
+      }
     }
-  }, [view])
+  }, [view, isScreenSharing, isRemoteScreenSharing, screenStream])
 
   // Recording Timer (freezes when paused)
   useEffect(() => {
@@ -655,6 +663,7 @@ export default function App() {
         () => cameraOnRef.current,
         () => true,
         activeFilterCss,
+        () => isRemoteScreenSharingRef.current,
       )
 
       recordingRef.current = true
@@ -811,16 +820,24 @@ export default function App() {
 
   async function handleToggleScreenShare() {
     if (isScreenSharing) {
-      screenStreamRef.current?.getTracks().forEach(t => t.stop())
-      screenStreamRef.current = null
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop())
+        screenStreamRef.current = null
+      }
+      setScreenStream(null)
       setIsScreenSharing(false)
       if (screenVideoRef.current) screenVideoRef.current.srcObject = null
 
-      if (pcRef.current && localStreamRef.current) {
-        const webcamTrack = localStreamRef.current.getVideoTracks()[0]
-        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
-        if (sender && webcamTrack) {
-          void sender.replaceTrack(webcamTrack)
+      if (recordingRef.current) {
+        recorderRef.current.updateScreenStream(null)
+      }
+
+      if (pcRef.current) {
+        const webcamTrack = localStreamRef.current?.getVideoTracks()[0] || null
+        const senders = pcRef.current.getSenders()
+        const videoSender = senders.find(s => s.track?.kind === 'video') || senders.find(s => s.track?.kind !== 'audio')
+        if (videoSender) {
+          void videoSender.replaceTrack(webcamTrack)
         }
       }
 
@@ -836,16 +853,26 @@ export default function App() {
 
     try {
       if (!navigator.mediaDevices?.getDisplayMedia) {
-        alert('Screen sharing is not supported in this browser. Please use Chrome, Edge, or Firefox.')
+        alert('Screen sharing is not supported by your current browser. Please use Chrome on Android, or Chrome/Edge/Firefox on desktop.')
         return
       }
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 30, max: 60 } },
-        audio: true,
+        video: {
+          displaySurface: 'monitor',
+          width: { ideal: 1920, max: 3840 },
+          height: { ideal: 1080, max: 2160 },
+          frameRate: { ideal: 30, max: 60 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
       })
 
       screenStreamRef.current = stream
+      setScreenStream(stream)
       setIsScreenSharing(true)
 
       if (screenVideoRef.current) {
@@ -853,12 +880,18 @@ export default function App() {
         void screenVideoRef.current.play().catch(() => undefined)
       }
 
-      // Replace WebRTC sender video track with screen track so remote participant sees screen!
+      // Update active recording with new screen stream
+      if (recordingRef.current) {
+        recorderRef.current.updateScreenStream(stream)
+      }
+
+      // Replace WebRTC sender video track with screen track so remote participant sees screen in HD
       const screenTrack = stream.getVideoTracks()[0]
       if (pcRef.current && screenTrack) {
-        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
-        if (sender) {
-          void sender.replaceTrack(screenTrack)
+        const senders = pcRef.current.getSenders()
+        const videoSender = senders.find(s => s.track?.kind === 'video') || senders.find(s => s.track?.kind !== 'audio')
+        if (videoSender) {
+          void videoSender.replaceTrack(screenTrack)
         }
       }
 
@@ -870,17 +903,26 @@ export default function App() {
         }).catch(() => undefined)
       }
 
-      // Handle browser native "Stop sharing" bar click
+      // Handle browser native "Stop sharing" floating bar click
       screenTrack.onended = () => {
-        screenStreamRef.current = null
+        if (screenStreamRef.current) {
+          screenStreamRef.current.getTracks().forEach(t => t.stop())
+          screenStreamRef.current = null
+        }
+        setScreenStream(null)
         setIsScreenSharing(false)
         if (screenVideoRef.current) screenVideoRef.current.srcObject = null
 
-        if (pcRef.current && localStreamRef.current) {
-          const webcamTrack = localStreamRef.current.getVideoTracks()[0]
-          const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
-          if (sender && webcamTrack) {
-            void sender.replaceTrack(webcamTrack)
+        if (recordingRef.current) {
+          recorderRef.current.updateScreenStream(null)
+        }
+
+        if (pcRef.current) {
+          const webcamTrack = localStreamRef.current?.getVideoTracks()[0] || null
+          const senders = pcRef.current.getSenders()
+          const videoSender = senders.find(s => s.track?.kind === 'video') || senders.find(s => s.track?.kind !== 'audio')
+          if (videoSender) {
+            void videoSender.replaceTrack(webcamTrack)
           }
         }
 
@@ -1018,6 +1060,7 @@ export default function App() {
           remoteVideoRef={remoteVideoRef}
           screenVideoRef={screenVideoRef}
           isScreenSharing={isScreenSharing}
+          screenStream={screenStream}
           onToggleScreenShare={handleToggleScreenShare}
           screenShareAllowedForAll={screenShareAllowedForAll}
           onToggleAllowScreenShare={handleToggleAllowScreenShare}

@@ -66,6 +66,7 @@ interface LiveWorkspaceProps {
   remoteVideoRef: React.RefObject<HTMLVideoElement | null>
   screenVideoRef?: React.RefObject<HTMLVideoElement | null>
   isScreenSharing?: boolean
+  screenStream?: MediaStream | null
   onToggleScreenShare?: () => void
   screenShareAllowedForAll?: boolean
   onToggleAllowScreenShare?: (allowed: boolean) => void
@@ -120,6 +121,7 @@ export default function LiveWorkspace({
   remoteVideoRef,
   screenVideoRef,
   isScreenSharing = false,
+  screenStream = null,
   onToggleScreenShare,
   screenShareAllowedForAll = true,
   onToggleAllowScreenShare,
@@ -204,6 +206,17 @@ export default function LiveWorkspace({
 
   const localContainerRef = useRef<HTMLDivElement | null>(null)
   const remoteContainerRef = useRef<HTMLDivElement | null>(null)
+  const screenStageContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Guarantee local and remote screen video streams attach immediately when presentation opens
+  useEffect(() => {
+    if (screenVideoRef?.current && isScreenSharing && screenStream) {
+      if (screenVideoRef.current.srcObject !== screenStream) {
+        screenVideoRef.current.srcObject = screenStream
+        void screenVideoRef.current.play().catch(() => undefined)
+      }
+    }
+  }, [isScreenSharing, screenStream, screenVideoRef])
 
   // Cycle PiP Corner across all 4 positions
   const cyclePipCorner = () => {
@@ -1028,16 +1041,64 @@ export default function LiveWorkspace({
               </div>
             )}
 
-            {/* Live Screen Share Stage View OR Dual Video Grid */}
-            {isScreenSharing ? (
-              <div className="screen-share-stage-container">
-                <video
-                  ref={screenVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="screen-share-video-elem"
-                />
+            {/* Live Screen Share Stage View (Local OR Remote Presentation) OR Dual Video Grid */}
+            {(isScreenSharing || isRemoteScreenSharing) ? (
+              <div ref={screenStageContainerRef} className="screen-share-stage-container">
+                {/* Presentation Stage Top Control Banner */}
+                <div className="screen-stage-top-banner">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <MonitorUp size={15} color="#06b6d4" />
+                    <span style={{ fontWeight: 600, color: '#ffffff', fontSize: 12.5 }}>
+                      {isScreenSharing
+                        ? 'You are presenting your screen in Ultra HD'
+                        : `${remoteScreenSharerName || remoteName || 'Participant'} is presenting screen in Ultra HD`}
+                    </span>
+                    <span className="rec-dot-pulsing" style={{ marginLeft: 4 }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {isScreenSharing ? (
+                      <button
+                        type="button"
+                        className="stage-banner-action-btn stop-share"
+                        onClick={onToggleScreenShare}
+                        title="Stop Screen Share"
+                      >
+                        <MonitorOff size={13} /> Stop Sharing
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="stage-banner-action-btn"
+                        onClick={() => handleFullscreen(screenStageContainerRef)}
+                        title="Toggle Fullscreen"
+                      >
+                        <Maximize2 size={13} /> Fullscreen
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Video Element: If Local is sharing, use screenVideoRef; If Remote is sharing, use remoteVideoRef! */}
+                {isScreenSharing ? (
+                  <video
+                    ref={screenVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="screen-share-video-elem"
+                    onLoadedMetadata={e => void (e.currentTarget as HTMLVideoElement).play().catch(() => undefined)}
+                  />
+                ) : (
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="screen-share-video-elem"
+                    style={{ objectFit: 'contain' }}
+                    onLoadedMetadata={e => void (e.currentTarget as HTMLVideoElement).play().catch(() => undefined)}
+                  />
+                )}
+
                 {/* Floating participant webcams in PiP dock */}
                 <div className="screen-share-pip-dock">
                   <div className="screen-share-pip-item local-video-container">
@@ -1052,7 +1113,7 @@ export default function LiveWorkspace({
                       <span>👑 {localName || 'You'}</span>
                     </div>
                   </div>
-                  {remotePresent && connected && (
+                  {isScreenSharing && remotePresent && connected && (
                     <div className="screen-share-pip-item">
                       <video
                         ref={remoteVideoRef}
@@ -1324,6 +1385,28 @@ export default function LiveWorkspace({
                   title={cameraOn ? 'Turn Camera Off' : 'Turn Camera On'}
                 >
                   {cameraOn ? <Video size={20} /> : <VideoOff size={20} />}
+                </button>
+
+                <button
+                  type="button"
+                  className={`dock-circle-btn ${isScreenSharing ? 'active' : ''}`}
+                  onClick={() => {
+                    if (isScreenSharing) {
+                      onToggleScreenShare?.()
+                    } else if (isHost || screenShareAllowedForAll) {
+                      onToggleScreenShare?.()
+                    } else {
+                      alert('Screen sharing is currently restricted by the host.')
+                    }
+                  }}
+                  title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+                  style={{
+                    background: isScreenSharing ? 'rgba(239, 68, 68, 0.25)' : undefined,
+                    borderColor: isScreenSharing ? '#ef4444' : undefined,
+                    color: isScreenSharing ? '#ef4444' : '#ffffff',
+                  }}
+                >
+                  {isScreenSharing ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
                 </button>
 
                 <button
