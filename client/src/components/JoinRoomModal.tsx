@@ -63,7 +63,7 @@ export default function JoinRoomModal({
         </div>
 
         {/* Brand Logo inside modal */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+        <div className="modal-brand-logo-wrap" style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <BrandLogo size={22} fontSize={16} />
         </div>
 
