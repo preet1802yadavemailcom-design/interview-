@@ -95,6 +95,10 @@ interface LiveWorkspaceProps {
   onUpdateAdjustments?: (adj: FilterAdjustments) => void
   facingMode?: 'user' | 'environment'
   onFlipCamera?: () => void
+  isRemoteScreenSharing?: boolean
+  remoteScreenSharerName?: string
+  onSendReaction?: (emoji: string) => void
+  registerRemoteReaction?: (cb: (emoji: string) => void) => void
 }
 
 export default function LiveWorkspace({
@@ -145,6 +149,10 @@ export default function LiveWorkspace({
   onUpdateAdjustments = () => {},
   facingMode = 'user',
   onFlipCamera,
+  isRemoteScreenSharing = false,
+  remoteScreenSharerName = '',
+  onSendReaction,
+  registerRemoteReaction,
 }: LiveWorkspaceProps) {
   const [activeTool, setActiveTool] = useState<'recording' | 'participants' | 'chat' | 'notes' | 'mixer' | 'screen' | 'info' | 'filters'>('recording')
   const [handRaised, setHandRaised] = useState(false)
@@ -234,11 +242,25 @@ export default function LiveWorkspace({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  useEffect(() => {
+    if (registerRemoteReaction) {
+      registerRemoteReaction((emoji: string) => {
+        const id = `${Date.now()}-${Math.random()}`
+        const x = 30 + Math.random() * 40
+        setReactions(prev => [...prev, { id, emoji, x }])
+        setTimeout(() => {
+          setReactions(prev => prev.filter(r => r.id !== id))
+        }, 2400)
+      })
+    }
+  }, [registerRemoteReaction])
+
   const triggerReaction = (emoji: string) => {
     const id = `${Date.now()}-${Math.random()}`
     const x = 30 + Math.random() * 40 // random horizontal position 30-70%
     setReactions(prev => [...prev, { id, emoji, x }])
     setShowReactionPicker(false)
+    onSendReaction?.(emoji)
 
     // Remove reaction after animation completes
     setTimeout(() => {
@@ -979,6 +1001,33 @@ export default function LiveWorkspace({
               </div>
             )}
 
+            {/* Remote Screen Sharing Floating Indicator */}
+            {isRemoteScreenSharing && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(14, 165, 233, 0.95)',
+                  color: '#ffffff',
+                  padding: '7px 20px',
+                  borderRadius: 999,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  boxShadow: '0 6px 20px rgba(14, 165, 233, 0.5)',
+                  zIndex: 40,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  letterSpacing: 0.3,
+                }}
+              >
+                <MonitorUp size={15} color="#ffffff" />
+                <span>{remoteScreenSharerName || remoteName || 'Participant'} is sharing screen in Ultra HD</span>
+              </div>
+            )}
+
             {/* Live Screen Share Stage View OR Dual Video Grid */}
             {isScreenSharing ? (
               <div className="screen-share-stage-container">
@@ -1201,6 +1250,7 @@ export default function LiveWorkspace({
                     style={{
                       display: remotePresent && connected ? 'block' : 'none',
                       transform: remoteRotation ? `rotate(${remoteRotation}deg)` : 'none',
+                      objectFit: isRemoteScreenSharing ? 'contain' : 'cover',
                       transition: 'transform 0.25s ease',
                     }}
                   />
@@ -1235,10 +1285,20 @@ export default function LiveWorkspace({
                     </div>
                   )}
                   {remotePresent && connected && (
-                    <div className="participant-label-pill">
-                      <span>🎙</span>
-                      <span>{remoteName || 'Guest'}</span>
-                      <AudioWaveform active={true} color="#10b981" height={13} />
+                    <div
+                      className={`participant-label-pill ${isRemoteScreenSharing ? 'screen-presenting-pill' : ''}`}
+                      style={{
+                        background: isRemoteScreenSharing ? 'rgba(14, 165, 233, 0.92)' : undefined,
+                        borderColor: isRemoteScreenSharing ? '#38bdf8' : undefined,
+                      }}
+                    >
+                      <span>{isRemoteScreenSharing ? '🖥' : '🎙'}</span>
+                      <span>
+                        {isRemoteScreenSharing
+                          ? `${remoteScreenSharerName || remoteName || 'Guest'} (Presenting Screen)`
+                          : remoteName || 'Guest'}
+                      </span>
+                      <AudioWaveform active={true} color={isRemoteScreenSharing ? '#38bdf8' : '#10b981'} height={13} />
                     </div>
                   )}
                 </div>

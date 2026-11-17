@@ -16,6 +16,9 @@ export type SignalKind =
   | 'allow-screen-share'
   | 'mute-all'
   | 'room-lock'
+  | 'chat'
+  | 'reaction'
+  | 'screen-share-status'
 
 export interface SignalMessage {
   from: string

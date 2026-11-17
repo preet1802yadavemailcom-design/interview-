@@ -72,11 +72,14 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false)
+  const [remoteScreenSharerName, setRemoteScreenSharerName] = useState('')
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
   const [screenShareAllowedForAll, setScreenShareAllowedForAll] = useState(true)
   const [isRoomLocked, setIsRoomLocked] = useState(false)
   const [participants, setParticipants] = useState<RoomMember[]>([])
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
+  const remoteReactionCallbackRef = useRef<((emoji: string) => void) | null>(null)
 
   // In-Meeting Chat
   const [chatMessages, setChatMessages] = useState<{ from: string; text: string; time: string }[]>([])
@@ -433,6 +436,27 @@ export default function App() {
         resetPeer()
         remoteStreamRef.current?.getTracks().forEach(t => t.stop())
         remoteStreamRef.current = null
+        setIsRemoteScreenSharing(false)
+        return
+      }
+
+      if (message.kind === 'chat' && message.data) {
+        const chatData = message.data as { from: string; text: string; time: string }
+        setChatMessages(prev => [...prev, chatData])
+        return
+      }
+
+      if (message.kind === 'reaction' && message.data) {
+        if (remoteReactionCallbackRef.current) {
+          remoteReactionCallbackRef.current(String(message.data))
+        }
+        return
+      }
+
+      if (message.kind === 'screen-share-status' && message.data) {
+        const info = message.data as { isSharing: boolean; sharerName?: string }
+        setIsRemoteScreenSharing(Boolean(info.isSharing))
+        if (info.sharerName) setRemoteScreenSharerName(info.sharerName)
         return
       }
 
@@ -791,6 +815,22 @@ export default function App() {
       screenStreamRef.current = null
       setIsScreenSharing(false)
       if (screenVideoRef.current) screenVideoRef.current.srcObject = null
+
+      if (pcRef.current && localStreamRef.current) {
+        const webcamTrack = localStreamRef.current.getVideoTracks()[0]
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+        if (sender && webcamTrack) {
+          void sender.replaceTrack(webcamTrack)
+        }
+      }
+
+      if (channelRef.current) {
+        void sendSignal(channelRef.current, {
+          from: userIdRef.current,
+          kind: 'screen-share-status',
+          data: { isSharing: false },
+        }).catch(() => undefined)
+      }
       return
     }
 
@@ -813,11 +853,44 @@ export default function App() {
         void screenVideoRef.current.play().catch(() => undefined)
       }
 
+      // Replace WebRTC sender video track with screen track so remote participant sees screen!
+      const screenTrack = stream.getVideoTracks()[0]
+      if (pcRef.current && screenTrack) {
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+        if (sender) {
+          void sender.replaceTrack(screenTrack)
+        }
+      }
+
+      if (channelRef.current) {
+        void sendSignal(channelRef.current, {
+          from: userIdRef.current,
+          kind: 'screen-share-status',
+          data: { isSharing: true, sharerName: name || (role === 'host' ? 'Host' : 'Guest') },
+        }).catch(() => undefined)
+      }
+
       // Handle browser native "Stop sharing" bar click
-      stream.getVideoTracks()[0].onended = () => {
+      screenTrack.onended = () => {
         screenStreamRef.current = null
         setIsScreenSharing(false)
         if (screenVideoRef.current) screenVideoRef.current.srcObject = null
+
+        if (pcRef.current && localStreamRef.current) {
+          const webcamTrack = localStreamRef.current.getVideoTracks()[0]
+          const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+          if (sender && webcamTrack) {
+            void sender.replaceTrack(webcamTrack)
+          }
+        }
+
+        if (channelRef.current) {
+          void sendSignal(channelRef.current, {
+            from: userIdRef.current,
+            kind: 'screen-share-status',
+            data: { isSharing: false },
+          }).catch(() => undefined)
+        }
       }
     } catch (err) {
       if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'NotAllowedError')) {
@@ -877,6 +950,24 @@ export default function App() {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
     setChatMessages(prev => [...prev, newMsg])
+
+    if (channelRef.current) {
+      void sendSignal(channelRef.current, {
+        from: userIdRef.current,
+        kind: 'chat',
+        data: newMsg,
+      }).catch(err => console.warn('[Chat] Broadcast error:', err))
+    }
+  }
+
+  const handleSendReaction = (emoji: string) => {
+    if (channelRef.current) {
+      void sendSignal(channelRef.current, {
+        from: userIdRef.current,
+        kind: 'reaction',
+        data: emoji,
+      }).catch(() => undefined)
+    }
   }
 
   return (
@@ -974,6 +1065,12 @@ export default function App() {
           onUpdateAdjustments={setFilterAdjustments}
           facingMode={facingMode}
           onFlipCamera={handleFlipCamera}
+          isRemoteScreenSharing={isRemoteScreenSharing}
+          remoteScreenSharerName={remoteScreenSharerName}
+          onSendReaction={handleSendReaction}
+          registerRemoteReaction={cb => {
+            remoteReactionCallbackRef.current = cb
+          }}
         />
       )}
 
