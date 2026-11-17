@@ -1,0 +1,13 @@
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="faq-shield-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff6b00" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#ff6b00" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <circle cx="200" cy="200" r="180" fill="url(#faq-shield-glow)" />
+  <path d="M 200 70 Q 280 70, 300 120 C 300 230, 200 310, 200 320 C 200 310, 100 230, 100 120 Q 120 70, 200 70 Z" 
+        stroke="#ff6b00" stroke-width="2" stroke-opacity="0.12" stroke-dasharray="6 6" fill="rgba(255, 107, 0, 0.02)" />
+  <path d="M 200 110 Q 260 110, 275 145 C 275 225, 200 280, 200 290 C 200 280, 125 225, 125 145 Q 140 110, 200 110 Z" 
+        stroke="#8a46ff" stroke-width="1.5" stroke-opacity="0.15" fill="none" />
+</svg>

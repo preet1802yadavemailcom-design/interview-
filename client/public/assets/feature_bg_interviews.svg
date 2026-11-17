@@ -1,0 +1,19 @@
+<svg width="320" height="240" viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="cam-glow" cx="80%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#ff6b00" stop-opacity="0.18" />
+      <stop offset="60%" stop-color="#ff6b00" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#ff6b00" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="320" height="240" fill="url(#cam-glow)" />
+  <!-- Subtle aperture / broadcast waves -->
+  <circle cx="270" cy="50" r="60" stroke="#ff6b00" stroke-width="1" stroke-opacity="0.12" stroke-dasharray="4 4" />
+  <circle cx="270" cy="50" r="40" stroke="#ff6b00" stroke-width="1" stroke-opacity="0.18" />
+  <circle cx="270" cy="50" r="20" stroke="#ff6b00" stroke-width="1" stroke-opacity="0.25" stroke-dasharray="2 3" />
+  <!-- Audio sine wave lines -->
+  <path d="M 10 200 C 40 185, 70 215, 100 200 C 130 185, 160 215, 190 200 C 220 185, 250 215, 280 200 C 295 192, 310 205, 320 200" 
+        stroke="#ff6b00" stroke-width="1.5" stroke-opacity="0.14" fill="none" />
+  <path d="M 10 215 C 40 205, 70 225, 100 215 C 130 205, 160 225, 190 215 C 220 205, 250 225, 280 215 C 295 210, 310 220, 320 215" 
+        stroke="#ff6b00" stroke-width="1" stroke-opacity="0.08" fill="none" />
+</svg>

@@ -1,0 +1,24 @@
+{
+  "name": "interviewcapture",
+  "private": true,
+  "version": "2.1.0",
+  "description": "Meet. Capture. Save. - Privacy-first browser-based interview and meeting recording application",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "preview": "npm run preview --prefix client",
+    "test": "npm test --prefix client"
+  },
+  "keywords": [
+    "interview",
+    "recording",
+    "webrtc",
+    "supabase",
+    "canvas",
+    "mediarecorder",
+    "ultra-hd"
+  ],
+  "author": "Preet Yadav",
+  "license": "MIT"
+}

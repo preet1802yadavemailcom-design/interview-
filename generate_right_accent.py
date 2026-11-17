@@ -1,0 +1,49 @@
+import os
+
+assets_dir = r"C:\Users\Preet Yadav\.gemini\antigravity\scratch\InterviewCapture\client\public\assets"
+
+# Studio right accent - warm ambient studio lighting, sound wave arcs, and glowing neon rim
+studio_right_svg = """<svg width="240" height="720" viewBox="0 0 240 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="spot-orange" cx="100%" cy="20%" r="90%">
+      <stop offset="0%" stop-color="#ff6b00" stop-opacity="0.35" />
+      <stop offset="40%" stop-color="#ff6b00" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#ff6b00" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="spot-violet" cx="100%" cy="70%" r="80%">
+      <stop offset="0%" stop-color="#8a46ff" stop-opacity="0.30" />
+      <stop offset="50%" stop-color="#8a46ff" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#8a46ff" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="neon-beam" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b00" stop-opacity="0.4" />
+      <stop offset="60%" stop-color="#8a46ff" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#8a46ff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Ambient light pools -->
+  <rect width="240" height="720" fill="url(#spot-orange)" />
+  <rect width="240" height="720" fill="url(#spot-violet)" />
+
+  <!-- Studio acoustic sound wave arcs -->
+  <path d="M 240 80 A 180 180 0 0 0 100 240" stroke="url(#neon-beam)" stroke-width="2" stroke-dasharray="4 6" opacity="0.6" />
+  <path d="M 240 130 A 140 140 0 0 0 130 250" stroke="#ff6b00" stroke-width="1.5" stroke-opacity="0.35" />
+  <path d="M 240 180 A 100 100 0 0 0 160 260" stroke="#ff6b00" stroke-width="1.2" stroke-dasharray="3 3" stroke-opacity="0.4" />
+
+  <!-- Lower violet acoustic arcs -->
+  <path d="M 240 480 A 200 200 0 0 0 80 620" stroke="url(#neon-beam)" stroke-width="1.8" stroke-dasharray="6 8" opacity="0.5" />
+  <path d="M 240 530 A 150 150 0 0 0 120 640" stroke="#8a46ff" stroke-width="1.5" stroke-opacity="0.35" />
+
+  <!-- Studio vertical light slat indicators -->
+  <g opacity="0.18">
+    <line x1="230" y1="20" x2="230" y2="700" stroke="#ffffff" stroke-width="1.5" />
+    <line x1="215" y1="60" x2="215" y2="660" stroke="#ffffff" stroke-width="1" />
+    <line x1="200" y1="120" x2="200" y2="600" stroke="#ffffff" stroke-width="1" stroke-dasharray="4 8" />
+  </g>
+</svg>"""
+
+with open(os.path.join(assets_dir, "bg_studio_right_accent.svg"), "w", encoding="utf-8") as f:
+    f.write(studio_right_svg)
+
+print("Generated bg_studio_right_accent.svg successfully!")

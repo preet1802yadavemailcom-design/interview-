@@ -1,0 +1,30 @@
+<svg width="1200" height="260" viewBox="0 0 1200 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="telemetry-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff6b00" stop-opacity="0.18" />
+      <stop offset="50%" stop-color="#8a46ff" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.18" />
+    </linearGradient>
+  </defs>
+  <!-- Frequency spectrum bars -->
+  <g opacity="0.12">
+    <rect x="50" y="160" width="4" height="40" fill="#ff6b00" rx="2" />
+    <rect x="62" y="140" width="4" height="60" fill="#ff6b00" rx="2" />
+    <rect x="74" y="170" width="4" height="30" fill="#ff6b00" rx="2" />
+    <rect x="86" y="130" width="4" height="70" fill="#ff6b00" rx="2" />
+    <rect x="98" y="150" width="4" height="50" fill="#ff6b00" rx="2" />
+    <rect x="110" y="120" width="4" height="80" fill="#ff6b00" rx="2" />
+    <rect x="122" y="165" width="4" height="35" fill="#ff6b00" rx="2" />
+    <rect x="134" y="145" width="4" height="55" fill="#ff6b00" rx="2" />
+
+    <rect x="1050" y="140" width="4" height="60" fill="#10b981" rx="2" />
+    <rect x="1062" y="120" width="4" height="80" fill="#10b981" rx="2" />
+    <rect x="1074" y="150" width="4" height="50" fill="#10b981" rx="2" />
+    <rect x="1086" y="135" width="4" height="65" fill="#10b981" rx="2" />
+    <rect x="1098" y="160" width="4" height="40" fill="#10b981" rx="2" />
+    <rect x="1110" y="125" width="4" height="75" fill="#10b981" rx="2" />
+  </g>
+  <!-- Continuous telemetry sine curve -->
+  <path d="M 0 190 Q 150 130, 300 190 T 600 190 T 900 190 T 1200 190" stroke="url(#telemetry-grad)" stroke-width="2" fill="none" opacity="0.3" />
+  <path d="M 0 190 Q 150 230, 300 190 T 600 190 T 900 190 T 1200 190" stroke="url(#telemetry-grad)" stroke-width="1.2" stroke-dasharray="4 4" fill="none" opacity="0.2" />
+</svg>

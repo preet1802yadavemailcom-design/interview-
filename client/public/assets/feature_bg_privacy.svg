@@ -1,0 +1,19 @@
+<svg width="320" height="240" viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="priv-glow" cx="80%" cy="25%" r="70%">
+      <stop offset="0%" stop-color="#8a46ff" stop-opacity="0.2" />
+      <stop offset="60%" stop-color="#8a46ff" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#8a46ff" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="320" height="240" fill="url(#priv-glow)" />
+  <!-- Security Shield Silhouette -->
+  <path d="M 255 35 Q 285 35, 290 55 C 290 95, 255 125, 255 130 C 255 125, 220 95, 220 55 Q 225 35, 255 35 Z" 
+        stroke="#8a46ff" stroke-width="1.5" stroke-opacity="0.25" fill="rgba(138, 70, 255, 0.04)" />
+  <!-- Inner lock core -->
+  <rect x="247" y="70" width="16" height="13" rx="3" fill="#8a46ff" opacity="0.3" />
+  <path d="M 251 70 L 251 65 C 251 62.5, 259 62.5, 259 65 L 259 70" stroke="#8a46ff" stroke-width="1.5" stroke-opacity="0.4" fill="none" />
+  <!-- Biometric ripple rings -->
+  <circle cx="255" cy="76" r="42" stroke="#8a46ff" stroke-width="1" stroke-opacity="0.12" stroke-dasharray="3 4" />
+  <circle cx="255" cy="76" r="60" stroke="#8a46ff" stroke-width="1" stroke-opacity="0.08" stroke-dasharray="6 6" />
+</svg>
