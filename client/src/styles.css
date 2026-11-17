@@ -1309,6 +1309,11 @@ input:checked + .slider:before {
   display: block;
 }
 
+/* Local Webcam Reflection Mirror (Flips self-view horizontally so movement feels natural) */
+.local-video-container video {
+  transform: scaleX(-1);
+}
+
 .video-fallback-portrait {
   width: 100%;
   height: 100%;
@@ -1332,6 +1337,164 @@ input:checked + .slider:before {
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 2;
+}
+
+/* ==============================================================================
+   WAITING FOR PARTICIPANTS TILE (Replaces fake opponent photo)
+   ============================================================================== */
+.waiting-participant-card {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #151d30 0%, #0c101c 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.waiting-pulse-rings {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.waiting-pulse-rings .pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 107, 0, 0.4);
+  animation: waitingRadar 2.4s ease-out infinite;
+}
+
+.waiting-pulse-rings .pulse-ring.ring-2 {
+  animation-delay: 1.2s;
+}
+
+@keyframes waitingRadar {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.waiting-radar-center {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255, 107, 0, 0.12);
+  border: 1px solid rgba(255, 107, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: 0 0 20px rgba(255, 107, 0, 0.25);
+}
+
+.waiting-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.waiting-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+  max-width: 360px;
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+
+.waiting-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 107, 0, 0.14);
+  border: 1px solid #ff6b00;
+  color: #ffaa66;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.waiting-copy-btn:hover {
+  background: #ff6b00;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(255, 107, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+/* ==============================================================================
+   LIVE SCREEN SHARING STAGE
+   ============================================================================== */
+.screen-share-stage-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #05070d;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  aspect-ratio: 16 / 9;
+}
+
+.screen-share-video-elem {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.screen-share-pip-dock {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+.screen-share-pip-item {
+  width: 190px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 107, 0, 0.6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  position: relative;
+  background: #0d121f;
+}
+
+.screen-share-pip-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dock-circle-btn.sharing-screen {
+  background: rgba(239, 68, 68, 0.22) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5) !important;
 }
 
 /* Floating Dock Toolbar */

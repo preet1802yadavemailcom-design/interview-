@@ -280,17 +280,21 @@ export class InterviewRecorder {
 
       const outputStream = new MediaStream(combinedTracks)
 
-      // Determine optimal supported WebM mime type
+      // Determine optimal supported container format
+      // Prioritize MP4 (H.264/AVC) for universal native playback in Windows Media Player, QuickTime, iOS, and Android
       const mimeCandidates = [
+        'video/mp4;codecs=avc1,mp4a.40.2',
+        'video/mp4;codecs=avc1',
+        'video/mp4',
+        'video/webm;codecs=h264,opus',
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
-        'video/webm;codecs=h264,opus',
         'video/webm',
       ]
 
       const selectedMime = mimeCandidates.find(type => MediaRecorder.isTypeSupported(type))
       if (!selectedMime) {
-        throw new Error('This browser does not support WebM recording. Please use current Chrome, Edge, or Firefox.')
+        throw new Error('This browser does not support video recording. Please use current Chrome, Edge, or Firefox.')
       }
 
       this.chunks = []
@@ -328,7 +332,9 @@ export class InterviewRecorder {
       }
 
       recorder.onstop = () => {
-        const mimeType = recorder.mimeType || 'video/webm'
+        const mimeType = recorder.mimeType || 'video/mp4'
+        const isMp4 = mimeType.includes('mp4')
+        const extension = isMp4 ? 'mp4' : 'webm'
         const blob = new Blob(this.chunks, { type: mimeType })
         const durationMs = Date.now() - this.startedAt
         const hasScreen = this.screenWasSelected
@@ -336,7 +342,7 @@ export class InterviewRecorder {
         const sizeBytes = blob.size
 
         const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-        const filename = `InterviewCapture_${dateStamp}.webm`
+        const filename = `InterviewCapture_${dateStamp}.${extension}`
 
         this.cleanup()
         resolve({
@@ -409,12 +415,21 @@ type SavePickerWindow = Window & {
  */
 export async function saveRecording(blob: Blob, filename: string): Promise<'saved' | 'downloaded' | 'cancelled'> {
   const pickerWindow = window as SavePickerWindow
+  const isMp4 = filename.endsWith('.mp4')
 
   if (typeof pickerWindow.showSaveFilePicker === 'function') {
     try {
       const handle = await pickerWindow.showSaveFilePicker({
         suggestedName: filename,
-        types: [{ description: 'WebM Video', accept: { 'video/webm': ['.webm'] } }],
+        types: isMp4
+          ? [
+              { description: 'MP4 Video (*.mp4)', accept: { 'video/mp4': ['.mp4'] } },
+              { description: 'WebM Video (*.webm)', accept: { 'video/webm': ['.webm'] } },
+            ]
+          : [
+              { description: 'WebM Video (*.webm)', accept: { 'video/webm': ['.webm'] } },
+              { description: 'MP4 Video (*.mp4)', accept: { 'video/mp4': ['.mp4'] } },
+            ],
       })
       const writable = await handle.createWritable()
       await writable.write(blob)
@@ -438,7 +453,6 @@ export async function saveRecording(blob: Blob, filename: string): Promise<'save
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 120_000)
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
   return 'downloaded'
 }

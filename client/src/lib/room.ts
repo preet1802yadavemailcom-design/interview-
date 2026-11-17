@@ -22,7 +22,7 @@ export interface SignalMessage {
 
 export interface RoomMember {
   userId: string
-  role: 'host' | 'guest'
+  role: 'host' | 'guest' | 'participant'
   displayName: string
 }
 

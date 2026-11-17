@@ -5,6 +5,7 @@ import {
   MicOff,
   VideoOff,
   MonitorUp,
+  MonitorOff,
   Hand,
   MoreHorizontal,
   PhoneOff,
@@ -30,6 +31,7 @@ import BrandLogo from './BrandLogo'
 import AudioWaveform from './AudioWaveform'
 import ReactionOverlay, { FloatingReaction } from './ReactionOverlay'
 import { VIDEO_FILTERS, type FilterAdjustments } from '../lib/filters'
+import type { RoomMember } from '../lib/room'
 
 interface LiveWorkspaceProps {
   meetingTitle: string
@@ -46,6 +48,10 @@ interface LiveWorkspaceProps {
   audioPlaybackBlocked: boolean
   localVideoRef: React.RefObject<HTMLVideoElement | null>
   remoteVideoRef: React.RefObject<HTMLVideoElement | null>
+  screenVideoRef?: React.RefObject<HTMLVideoElement | null>
+  isScreenSharing?: boolean
+  onToggleScreenShare?: () => void
+  participants?: RoomMember[]
   onToggleMic: () => void
   onToggleCamera: () => void
   onOpenRecordingModal: () => void
@@ -83,6 +89,10 @@ export default function LiveWorkspace({
   audioPlaybackBlocked,
   localVideoRef,
   remoteVideoRef,
+  screenVideoRef,
+  isScreenSharing = false,
+  onToggleScreenShare,
+  participants = [],
   onToggleMic,
   onToggleCamera,
   onOpenRecordingModal,
@@ -214,8 +224,8 @@ export default function LiveWorkspace({
               <span>{layoutMode === 'grid' ? 'Grid View' : 'PiP View'}</span>
             </button>
 
-            <div className="pill-stat">
-              <Users size={14} /> <span>{remotePresent ? 2 : 2}</span>
+            <div className="pill-stat" title="Up to 100 participants supported in this room">
+              <Users size={14} /> <span>{participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)} / 100</span>
             </div>
 
             {/* 3 Green vertical bars */}
@@ -256,68 +266,132 @@ export default function LiveWorkspace({
               </div>
             )}
 
-            {/* Dual Video Grid (Adaptive Layout: Grid or PiP) */}
-            <div className={`video-stage-grid ${layoutMode === 'pip' ? 'layout-pip-mode' : ''}`}>
-              {/* Left Participant (Interviewer / Preet Yadav) */}
-              <div className="video-container local-video-container">
+            {/* Live Screen Share Stage View OR Dual Video Grid */}
+            {isScreenSharing ? (
+              <div className="screen-share-stage-container">
                 <video
-                  ref={localVideoRef}
+                  ref={screenVideoRef}
                   autoPlay
+                  playsInline
                   muted
-                  playsInline
-                  style={{
-                    display: cameraOn ? 'block' : 'none',
-                    filter: activeFilterCss,
-                  }}
+                  className="screen-share-video-elem"
                 />
-                {!cameraOn && (
-                  <img
-                    src="/assets/interviewer_photo.jpg"
-                    alt="Preet Yadav"
-                    className="video-fallback-portrait"
-                    style={{ filter: activeFilterCss }}
-                  />
-                )}
-                {/* Active Filter Pill Badge */}
-                <button
-                  type="button"
-                  className="video-filter-pill-trigger"
-                  onClick={() => setActiveTool(activeTool === 'filters' ? 'recording' : 'filters')}
-                  title="Change Ultra HD Camera Filter"
-                >
-                  <Sparkles size={11} color="#06b6d4" />
-                  <span>{(VIDEO_FILTERS.find(f => f.id === activeFilterId) || VIDEO_FILTERS[0]).name.split(' ')[0]}</span>
-                </button>
-
-                <div className="participant-label-pill">
-                  <span style={{ color: '#f59e0b' }}>👑</span>
-                  <span>{localName || 'Preet Yadav'} (You)</span>
-                  <AudioWaveform active={micOn} color="#ff6b00" height={13} />
+                {/* Floating participant webcams in PiP dock */}
+                <div className="screen-share-pip-dock">
+                  <div className="screen-share-pip-item local-video-container">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      style={{ filter: activeFilterCss }}
+                    />
+                    <div className="participant-label-pill" style={{ bottom: 6, left: 6, fontSize: 10, padding: '3px 8px' }}>
+                      <span>👑 {localName || 'You'}</span>
+                    </div>
+                  </div>
+                  {remotePresent && connected && (
+                    <div className="screen-share-pip-item">
+                      <video
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                      />
+                      <div className="participant-label-pill" style={{ bottom: 6, left: 6, fontSize: 10, padding: '3px 8px' }}>
+                        <span>🎙 {remoteName || 'Guest'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Right Participant (Interviewee) */}
-              <div className="video-container remote-video">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  style={{ display: remotePresent && connected ? 'block' : 'none' }}
-                />
-                {(!remotePresent || !connected) && (
-                  <img
-                    src="/assets/guest_photo.jpg"
-                    alt="Interviewer"
-                    className="video-fallback-portrait"
+            ) : (
+              <div className={`video-stage-grid ${layoutMode === 'pip' ? 'layout-pip-mode' : ''}`}>
+                {/* Left Participant (Interviewer / Preet Yadav) */}
+                <div className="video-container local-video-container">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    style={{
+                      display: cameraOn ? 'block' : 'none',
+                      filter: activeFilterCss,
+                    }}
                   />
-                )}
-                <div className="participant-label-pill">
-                  <span>🎙</span>
-                  <span>{remoteName || (isHost ? 'Interviewer' : 'Interviewer')}</span>
-                  <AudioWaveform active={true} color="#10b981" height={13} />
+                  {!cameraOn && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#0e1424' }}>
+                      <div style={{ width: 68, height: 68, borderRadius: '50%', background: '#ff6b00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: '#fff', boxShadow: '0 0 20px rgba(255,107,0,0.4)' }}>
+                        {(localName || 'P').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 13, color: '#94a3b8', marginTop: 10, fontWeight: 500 }}>Camera Off</span>
+                    </div>
+                  )}
+                  {/* Active Filter Pill Badge */}
+                  <button
+                    type="button"
+                    className="video-filter-pill-trigger"
+                    onClick={() => setActiveTool(activeTool === 'filters' ? 'recording' : 'filters')}
+                    title="Change Ultra HD Camera Filter"
+                  >
+                    <Sparkles size={11} color="#06b6d4" />
+                    <span>{(VIDEO_FILTERS.find(f => f.id === activeFilterId) || VIDEO_FILTERS[0]).name.split(' ')[0]}</span>
+                  </button>
+
+                  <div className="participant-label-pill">
+                    <span style={{ color: '#f59e0b' }}>👑</span>
+                    <span>{localName || 'Preet Yadav'} (You)</span>
+                    <AudioWaveform active={micOn} color="#ff6b00" height={13} />
+                  </div>
+                </div>
+
+                {/* Right Participant (Real video when connected, Clean waiting radar when alone) */}
+                <div className="video-container remote-video">
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    style={{ display: remotePresent && connected ? 'block' : 'none' }}
+                  />
+                  {(!remotePresent || !connected) && (
+                    <div className="waiting-participant-card">
+                      <div className="waiting-pulse-rings">
+                        <div className="pulse-ring ring-1" />
+                        <div className="pulse-ring ring-2" />
+                        <div className="waiting-radar-center">
+                          <Users size={24} color="#ff6b00" />
+                        </div>
+                      </div>
+                      <div className="waiting-title">Waiting for participants…</div>
+                      <div className="waiting-subtitle">
+                        Room is ready. Share the invite link with up to 100 participants to start.
+                      </div>
+                      <button
+                        type="button"
+                        className="waiting-copy-btn"
+                        onClick={onCopyInvite}
+                      >
+                        {copiedInvite ? (
+                          <>
+                            <Check size={14} color="#10b981" /> Link Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Copy Room Link
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  {remotePresent && connected && (
+                    <div className="participant-label-pill">
+                      <span>🎙</span>
+                      <span>{remoteName || 'Guest'}</span>
+                      <AudioWaveform active={true} color="#10b981" height={13} />
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Floating Dock Toolbar */}
             <div className="floating-dock-toolbar">
@@ -359,16 +433,24 @@ export default function LiveWorkspace({
                   <span>Filters</span>
                 </div>
 
-                {/* Screen Share */}
+                {/* Live Screen Share Toggle */}
                 <div className="dock-item-labeled">
                   <button
-                    className="dock-circle-btn"
-                    onClick={() => setActiveTool('screen')}
-                    title="Share Screen"
+                    className={`dock-circle-btn ${isScreenSharing ? 'sharing-screen' : ''}`}
+                    onClick={() => {
+                      if (onToggleScreenShare) {
+                        onToggleScreenShare()
+                      } else {
+                        setActiveTool('screen')
+                      }
+                    }}
+                    title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
                   >
-                    <MonitorUp size={19} />
+                    {isScreenSharing ? <MonitorOff size={19} color="#ef4444" /> : <MonitorUp size={19} />}
                   </button>
-                  <span>Screen Share</span>
+                  <span style={{ color: isScreenSharing ? '#ef4444' : undefined, fontWeight: isScreenSharing ? 600 : undefined }}>
+                    {isScreenSharing ? 'Stop Share' : 'Share Screen'}
+                  </span>
                 </div>
 
                 {/* Prominent Recording Control Button */}
@@ -508,7 +590,7 @@ export default function LiveWorkspace({
                 onClick={() => setActiveTool('participants')}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Users size={16} /> <span>Participants (2)</span>
+                  <Users size={16} /> <span>Participants ({participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)})</span>
                 </div>
               </button>
 
@@ -667,14 +749,33 @@ export default function LiveWorkspace({
 
               {activeTool === 'participants' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span>👑 {localName || 'Preet Yadav'} (Host)</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#94a3b8', marginBottom: 2 }}>
+                    <span>Joined ({participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)} / 100)</span>
+                    <span style={{ color: '#10b981', fontWeight: 600 }}>Active</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,107,0,0.08)', border: '1px solid rgba(255,107,0,0.2)' }}>
+                    <span>👑 {localName || 'You'} ({isHost ? 'Host' : 'You'})</span>
                     <AudioWaveform active={micOn} color="#ff6b00" height={12} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span>👤 {remoteName || 'Sarah Chen (Guest)'}</span>
-                    <AudioWaveform active={true} color="#10b981" height={12} />
-                  </div>
+                  {participants && participants.length > 0 ? (
+                    participants
+                      .filter(p => p.displayName !== localName)
+                      .map((p, idx) => (
+                        <div key={p.userId || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <span>{p.role === 'host' ? '👑' : '🎙'} {p.displayName}</span>
+                          <AudioWaveform active={true} color="#10b981" height={12} />
+                        </div>
+                      ))
+                  ) : remotePresent ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span>🎙 {remoteName || 'Guest'}</span>
+                      <AudioWaveform active={true} color="#10b981" height={12} />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic', padding: '14px 8px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                      No other participants yet.<br />Share the invite link to let up to 100 people join.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -791,11 +892,42 @@ export default function LiveWorkspace({
               )}
 
               {activeTool === 'screen' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }}>
-                  <p style={{ color: '#94a3b8' }}>Select screen or window to capture. To record screen with both video tiles, select PiP mode in Recording Options.</p>
-                  <button className="btn-secondary-dark" onClick={onOpenRecordingModal}>
-                    Open Recording Options
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MonitorUp size={16} color="#ff6b00" /> Screen Sharing
+                  </div>
+                  <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                    Share your entire screen, an application window, or a specific browser tab in Ultra HD with high frame rate.
+                  </p>
+                  <button
+                    className={isScreenSharing ? "btn-secondary-dark" : "btn-primary-orange"}
+                    style={{
+                      padding: '10px 16px',
+                      fontSize: 13,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      background: isScreenSharing ? 'rgba(239, 68, 68, 0.2)' : undefined,
+                      borderColor: isScreenSharing ? '#ef4444' : undefined,
+                      color: isScreenSharing ? '#ef4444' : undefined,
+                    }}
+                    onClick={onToggleScreenShare}
+                  >
+                    {isScreenSharing ? (
+                      <>
+                        <MonitorOff size={16} /> Stop Screen Share
+                      </>
+                    ) : (
+                      <>
+                        <MonitorUp size={16} /> Start Screen Share
+                      </>
+                    )}
                   </button>
+                  <div style={{ fontSize: 11.5, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                    <span>✓ Broadcasts live to all meeting participants</span>
+                    <span>✓ Automatically recorded in 1080p canvas side-by-side or PiP</span>
+                  </div>
                 </div>
               )}
             </div>

@@ -31,11 +31,10 @@ create index if not exists idx_interview_rooms_expires_at
 create table if not exists public.interview_room_members (
   room_code text not null references public.interview_rooms(room_code) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  role text not null check (role in ('host', 'guest')),
+  role text not null check (role in ('host', 'guest', 'participant')),
   display_name text not null check (char_length(display_name) between 1 and 40),
   joined_at timestamptz not null default now(),
-  primary key (room_code, user_id),
-  unique (room_code, role)
+  primary key (room_code, user_id)
 );
 
 create index if not exists idx_interview_members_user 
@@ -120,6 +119,7 @@ declare
   v_room public.interview_rooms%rowtype;
   v_existing_role text;
   v_name text := left(trim(coalesce(p_display_name, 'Participant')), 40);
+  v_member_count int;
 begin
   if v_user_id is null then 
     raise exception 'Authentication required: please ensure anonymous sign-in is active.'; 
@@ -160,19 +160,20 @@ begin
     return v_existing_role;
   end if;
 
-  -- Ensure strictly 2 participants maximum (1 host + 1 guest)
-  if exists (
-    select 1 from public.interview_room_members 
-    where room_code = p_room_code and role = 'guest'
-  ) then
-    raise exception 'This interview room is already full (maximum 2 participants).';
+  -- Support up to 100 participants per room
+  select count(*) into v_member_count
+  from public.interview_room_members 
+  where room_code = p_room_code;
+
+  if v_member_count >= 100 then
+    raise exception 'This interview room is already full (maximum 100 participants reached).';
   end if;
 
-  -- Reserve guest seat
+  -- Reserve participant seat
   insert into public.interview_room_members(room_code, user_id, role, display_name)
-  values (p_room_code, v_user_id, 'guest', v_name);
+  values (p_room_code, v_user_id, 'participant', v_name);
 
-  return 'guest';
+  return 'participant';
 end;
 $$;
 

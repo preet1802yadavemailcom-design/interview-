@@ -70,6 +70,9 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [participants, setParticipants] = useState<RoomMember[]>([])
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null)
 
   // In-Meeting Chat
   const [chatMessages, setChatMessages] = useState<{ from: string; text: string; time: string }[]>([])
@@ -401,6 +404,7 @@ export default function App() {
     try {
       const code = createRoomCode()
       setRoomCode(code)
+      window.history.pushState({}, '', '?room=' + code)
 
       const userId = await ensureAnonymousSession()
       userIdRef.current = userId
@@ -412,17 +416,19 @@ export default function App() {
       await prepareMedia(startCamera, startMic)
 
       const member: RoomMember = { userId, role: 'host', displayName }
+      setParticipants([member])
       const channel = await connectRoom(code, member, {
         onChannel: ch => {
           channelRef.current = ch
         },
         onSignal: msg => handleSignalRef.current(msg),
         onMembers: members => {
+          setParticipants(members)
           const others = members.filter(m => m.userId !== userId)
-          const guest = others.find(m => m.role === 'guest')
+          const guest = others.find(m => m.role === 'guest' || m.role === 'participant')
           remoteUserIdRef.current = others[0]?.userId || ''
           setRemotePresent(others.length > 0)
-          setRemoteName(others[0]?.displayName || 'Guest Interviewee')
+          setRemoteName(others[0]?.displayName || (others.length > 1 ? `${others[0]?.displayName} +${others.length - 1}` : 'Guest'))
 
           if (guest) void createOffer(guest.userId)
 
@@ -473,23 +479,26 @@ export default function App() {
       await prepareMedia(startCamera, startMic)
 
       const member: RoomMember = { userId, role: 'guest', displayName }
+      setParticipants([member])
       const channel = await connectRoom(code, member, {
         onChannel: ch => {
           channelRef.current = ch
         },
         onSignal: msg => handleSignalRef.current(msg),
         onMembers: members => {
+          setParticipants(members)
           const others = members.filter(m => m.userId !== userId)
           const host = others.find(m => m.role === 'host')
           remoteUserIdRef.current = others[0]?.userId || ''
           setRemotePresent(others.length > 0)
-          setRemoteName(others[0]?.displayName || 'Interviewer')
+          setRemoteName(others[0]?.displayName || (others.length > 1 ? `${others[0]?.displayName} +${others.length - 1}` : 'Interviewer'))
           if (host) hostIdRef.current = host.userId
         },
       })
 
       channelRef.current = channel
       setIsJoinModalOpen(false)
+      window.history.pushState({}, '', '?room=' + code)
       setView('meeting')
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not join interview room.')
@@ -647,8 +656,51 @@ export default function App() {
     setConnected(false)
     setRemotePresent(false)
     setRecording(false)
+    setIsScreenSharing(false)
     setView('landing')
     window.history.replaceState({}, '', window.location.pathname)
+  }
+
+  async function handleToggleScreenShare() {
+    if (isScreenSharing) {
+      screenStreamRef.current?.getTracks().forEach(t => t.stop())
+      screenStreamRef.current = null
+      setIsScreenSharing(false)
+      if (screenVideoRef.current) screenVideoRef.current.srcObject = null
+      return
+    }
+
+    try {
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        alert('Screen sharing is not supported in this browser. Please use Chrome, Edge, or Firefox.')
+        return
+      }
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 60 } },
+        audio: true,
+      })
+
+      screenStreamRef.current = stream
+      setIsScreenSharing(true)
+
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = stream
+        void screenVideoRef.current.play().catch(() => undefined)
+      }
+
+      // Handle browser native "Stop sharing" bar click
+      stream.getVideoTracks()[0].onended = () => {
+        screenStreamRef.current = null
+        setIsScreenSharing(false)
+        if (screenVideoRef.current) screenVideoRef.current.srcObject = null
+      }
+    } catch (err) {
+      if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'NotAllowedError')) {
+        return
+      }
+      alert('Could not start screen sharing: ' + (err instanceof Error ? err.message : String(err)))
+    }
   }
 
   const handleCopyInvite = async () => {
@@ -715,6 +767,10 @@ export default function App() {
           audioPlaybackBlocked={audioPlaybackBlocked}
           localVideoRef={localVideoRef}
           remoteVideoRef={remoteVideoRef}
+          screenVideoRef={screenVideoRef}
+          isScreenSharing={isScreenSharing}
+          onToggleScreenShare={handleToggleScreenShare}
+          participants={participants}
           onToggleMic={() => {
             const track = localStreamRef.current?.getAudioTracks()[0]
             if (track) {

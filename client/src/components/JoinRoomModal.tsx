@@ -27,13 +27,14 @@ export default function JoinRoomModal({
   onSelectFilter,
 }: JoinRoomModalProps) {
   const [code, setCode] = useState(initialCode)
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialCode ? 'Guest Participant' : '')
   const [cameraOn, setCameraOn] = useState(true)
   const [micOn, setMicOn] = useState(true)
 
   useEffect(() => {
     if (initialCode) {
       setCode(initialCode)
+      setName(prev => prev || 'Guest Participant')
     }
   }, [initialCode])
 
@@ -73,6 +74,13 @@ export default function JoinRoomModal({
 
         <h2 className="modal-title-text">Join Interview Room</h2>
         <p className="modal-subtitle-text">Enter your invitation code to join the meeting.</p>
+
+        {Boolean(initialCode) && (
+          <div style={{ background: 'rgba(255, 107, 0, 0.12)', border: '1px solid #ff6b00', borderRadius: 10, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#ffaa66', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Link2 size={14} color="#ff6b00" />
+            <span>Joining via invite link • Room <b>{initialCode}</b></span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
