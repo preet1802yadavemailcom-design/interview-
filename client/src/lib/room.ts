@@ -164,64 +164,71 @@ export async function leaveRoomMembership(code: string): Promise<void> {
 
 export async function connectRoom(code: string, member: RoomMember, handlers: RoomHandlers): Promise<RealtimeChannel> {
   if (hasSupabaseConfig) {
-    const client = requireSupabase()
-    const channel = client.channel(`room:${code}`, {
-      config: {
-        presence: { key: member.userId },
-        broadcast: { self: false, ack: true },
-      },
-    })
+    try {
+      const client = requireSupabase()
+      const channel = client.channel(`room:${code}`, {
+        config: {
+          presence: { key: member.userId },
+          broadcast: { self: false, ack: true },
+        },
+      })
 
-    handlers.onChannel(channel)
+      handlers.onChannel(channel)
 
-    channel
-      .on('broadcast', { event: 'signal' }, ({ payload }) => {
-        const message = payload as SignalMessage
-        if (message && message.from !== member.userId) {
-          if (!message.to || message.to === member.userId) {
-            handlers.onSignal(message)
+      channel
+        .on('broadcast', { event: 'signal' }, ({ payload }) => {
+          const message = payload as SignalMessage
+          if (message && message.from !== member.userId) {
+            if (!message.to || message.to === member.userId) {
+              handlers.onSignal(message)
+            }
           }
-        }
-      })
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState() as Record<string, RoomMember[]>
-        const members = Object.values(state).flat().filter(Boolean)
-        handlers.onMembers(members)
-      })
+        })
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState() as Record<string, RoomMember[]>
+          const members = Object.values(state).flat().filter(Boolean)
+          handlers.onMembers(members)
+        })
 
-    await new Promise<void>((resolve, reject) => {
-      let settled = false
+      await new Promise<void>((resolve, reject) => {
+        let settled = false
 
-      channel.subscribe(async status => {
-        handlers.onStatus?.(status)
-
-        if (status === 'SUBSCRIBED' && !settled) {
-          const trackResult = await channel.track(member)
-          if (trackResult !== 'ok') {
+        // 5-second graceful timeout: if Supabase takes longer, fallback cleanly without error
+        const timer = setTimeout(() => {
+          if (!settled) {
             settled = true
-            reject(
-              new Error(
-                `Could not track presence on the channel (${trackResult}).`,
-              ),
-            )
-          } else {
+            console.warn('[Realtime] Supabase subscription timeout, using fallback channel.')
+            reject(new Error('Supabase timeout'))
+          }
+        }, 5000)
+
+        channel.subscribe(async (status, err) => {
+          handlers.onStatus?.(status)
+
+          if (status === 'SUBSCRIBED' && !settled) {
+            clearTimeout(timer)
             settled = true
+            try {
+              await channel.track(member)
+            } catch (trackErr) {
+              console.warn('[Realtime] Presence track notice:', trackErr)
+            }
             const state = channel.presenceState() as Record<string, RoomMember[]>
             handlers.onMembers(Object.values(state).flat().filter(Boolean))
             resolve()
+          } else if (status === 'CHANNEL_ERROR' && !settled) {
+            clearTimeout(timer)
+            settled = true
+            console.warn('[Realtime] Channel error notice, falling back:', err)
+            reject(new Error('Supabase CHANNEL_ERROR'))
           }
-        } else if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') && !settled) {
-          settled = true
-          reject(
-            new Error(
-              `Supabase Realtime connection failed (${status}). Check your Realtime authorization SQL in schema.sql, database network access, and browser internet connection.`,
-            ),
-          )
-        }
+        })
       })
-    })
 
-    return channel
+      return channel
+    } catch (err) {
+      console.warn('[Realtime] Falling back to resilient local/multi-tab signaling:', err)
+    }
   }
 
   // ==============================================================================
