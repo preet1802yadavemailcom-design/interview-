@@ -191,12 +191,6 @@ export default function JoinRoomModal({
             </div>
           )}
 
-          {!hasSupabaseConfig && (
-            <div className="config-warning-pill">
-              ℹ Live WebRTC signaling requires Supabase credentials in client/.env.
-            </div>
-          )}
-
           <button
             type="submit"
             className="btn-primary-orange btn-full-width"

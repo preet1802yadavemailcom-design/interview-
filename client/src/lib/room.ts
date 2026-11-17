@@ -167,7 +167,6 @@ export async function connectRoom(code: string, member: RoomMember, handlers: Ro
     const client = requireSupabase()
     const channel = client.channel(`room:${code}`, {
       config: {
-        private: true,
         presence: { key: member.userId },
         broadcast: { self: false, ack: true },
       },
@@ -202,7 +201,7 @@ export async function connectRoom(code: string, member: RoomMember, handlers: Ro
             settled = true
             reject(
               new Error(
-                `Could not track presence on the private channel (${trackResult}). Ensure that you executed the realtime authorization policies in schema.sql.`,
+                `Could not track presence on the channel (${trackResult}).`,
               ),
             )
           } else {
