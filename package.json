@@ -6,9 +6,18 @@
   "type": "module",
   "scripts": {
     "dev": "npm run dev --prefix client",
-    "build": "npm run build --prefix client",
+    "build": "npm --prefix client install && npm run build --prefix client",
     "preview": "npm run preview --prefix client",
     "test": "npm test --prefix client"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7"
   },
   "keywords": [
     "interview",
