@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   LayoutDashboard,
   Calendar,
@@ -81,6 +81,21 @@ export default function DashboardView({
   })
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleLocalVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    setPlayingItem({
+      id: `local-${Date.now()}`,
+      title: file.name,
+      dateTime: 'Local Disk Video',
+      duration: 'Full Recording',
+      size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+      url,
+    })
+  }
 
   const filtered = recordings.filter(r =>
     r.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -240,6 +255,23 @@ export default function DashboardView({
                   className="search-input"
                 />
               </div>
+
+              <button
+                type="button"
+                className="btn-secondary-dark"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', fontSize: 13 }}
+                onClick={() => fileInputRef.current?.click()}
+                title="Open and play any recorded video from your computer"
+              >
+                <Film size={15} color="#ff6b00" /> Play Local Video
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="video/*,.webm,.mp4"
+                style={{ display: 'none' }}
+                onChange={handleLocalVideoUpload}
+              />
 
               <button className="btn-primary-orange" onClick={onNewMeeting}>
                 <Plus size={16} /> New Meeting

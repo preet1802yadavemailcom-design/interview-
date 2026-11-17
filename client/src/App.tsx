@@ -64,6 +64,7 @@ export default function App() {
   const [guestConsented, setGuestConsented] = useState(true)
   const [guestDeclined, setGuestDeclined] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [isRecordingPaused, setIsRecordingPaused] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [result, setResult] = useState<RecorderResult | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -115,14 +116,14 @@ export default function App() {
     }
   }, [view])
 
-  // Recording Timer
+  // Recording Timer (freezes when paused)
   useEffect(() => {
-    if (!recording) return
+    if (!recording || isRecordingPaused) return
     timerRef.current = window.setInterval(() => setRecordingSeconds(v => v + 1), 1000)
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current)
     }
-  }, [recording])
+  }, [recording, isRecordingPaused])
 
   // Preview Object URL Lifecycle
   useEffect(() => {
@@ -318,6 +319,17 @@ export default function App() {
 
       if (message.kind === 'recording-stop') {
         setRecording(false)
+        setIsRecordingPaused(false)
+        return
+      }
+
+      if (message.kind === 'recording-pause') {
+        setIsRecordingPaused(true)
+        return
+      }
+
+      if (message.kind === 'recording-resume') {
+        setIsRecordingPaused(false)
         return
       }
 
@@ -577,11 +589,39 @@ export default function App() {
     }
   }
 
+  function handleTogglePauseRecording() {
+    if (!recording) return
+    if (!isRecordingPaused) {
+      const ok = recorderRef.current.pause()
+      if (ok) {
+        setIsRecordingPaused(true)
+        if (channelRef.current && roleRef.current === 'host') {
+          void sendSignal(channelRef.current, {
+            from: userIdRef.current,
+            kind: 'recording-pause',
+          }).catch(() => undefined)
+        }
+      }
+    } else {
+      const ok = recorderRef.current.resume()
+      if (ok) {
+        setIsRecordingPaused(false)
+        if (channelRef.current && roleRef.current === 'host') {
+          void sendSignal(channelRef.current, {
+            from: userIdRef.current,
+            kind: 'recording-resume',
+          }).catch(() => undefined)
+        }
+      }
+    }
+  }
+
   async function handleStopRecording() {
     try {
       const saved = await recorderRef.current.stop()
       recordingRef.current = false
       setRecording(false)
+      setIsRecordingPaused(false)
       setResult(saved)
       setIsPreviewModalOpen(true)
 
@@ -815,7 +855,9 @@ export default function App() {
           remotePresent={remotePresent}
           connected={connected}
           recording={recording}
+          isRecordingPaused={isRecordingPaused}
           recordingSeconds={recordingSeconds}
+          onTogglePauseRecording={handleTogglePauseRecording}
           micOn={micOn}
           cameraOn={cameraOn}
           audioPlaybackBlocked={audioPlaybackBlocked}

@@ -24,6 +24,8 @@ export class InterviewRecorder {
   private hasScreen = false
   private screenWasSelected = false
   private screenHasAudio = false
+  private totalPausedMs = 0
+  private pauseStartedAt = 0
 
   async start(
     localStream: MediaStream,
@@ -338,7 +340,12 @@ export class InterviewRecorder {
         const isMp4 = mimeType.includes('mp4')
         const extension = isMp4 ? 'mp4' : 'webm'
         const rawBlob = new Blob(this.chunks, { type: mimeType })
-        const durationMs = Math.max(1000, Date.now() - this.startedAt)
+        if (this.pauseStartedAt > 0) {
+          this.totalPausedMs += Date.now() - this.pauseStartedAt
+          this.pauseStartedAt = 0
+        }
+        const activeDuration = Date.now() - this.startedAt - this.totalPausedMs
+        const durationMs = Math.max(1000, activeDuration)
         let finalBlob = rawBlob
 
         // Fix missing EBML duration metadata in WebM files recorded from Chrome/Edge
@@ -371,6 +378,31 @@ export class InterviewRecorder {
 
       recorder.stop()
     })
+  }
+
+  pause(): boolean {
+    if (this.recorder && this.recorder.state === 'recording') {
+      this.recorder.pause()
+      this.pauseStartedAt = Date.now()
+      return true
+    }
+    return false
+  }
+
+  resume(): boolean {
+    if (this.recorder && this.recorder.state === 'paused') {
+      this.recorder.resume()
+      if (this.pauseStartedAt > 0) {
+        this.totalPausedMs += Date.now() - this.pauseStartedAt
+        this.pauseStartedAt = 0
+      }
+      return true
+    }
+    return false
+  }
+
+  isPaused(): boolean {
+    return this.recorder?.state === 'paused'
   }
 
   private cleanup() {
@@ -422,6 +454,22 @@ type SavePickerWindow = Window & {
 }
 
 /**
+ * Directly downloads a video file via HTML5 anchor tag.
+ * This never locks files, bypasses File System Access permissions, and works reliably across all browsers.
+ */
+export function downloadRecording(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
+/**
  * Saves a recorded video file locally.
  * Prefers File System Access API (showSaveFilePicker) on Chromium browsers.
  * Seamlessly falls back to anchor download if picker is unavailable, unsupported, or rejected.
@@ -458,14 +506,6 @@ export async function saveRecording(blob: Blob, filename: string): Promise<'save
   }
 
   // Fallback anchor download
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.style.display = 'none'
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  downloadRecording(blob, filename)
   return 'downloaded'
 }

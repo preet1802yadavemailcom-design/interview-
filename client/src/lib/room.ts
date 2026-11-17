@@ -8,6 +8,8 @@ export type SignalKind =
   | 'leave'
   | 'recording-start'
   | 'recording-stop'
+  | 'recording-pause'
+  | 'recording-resume'
   | 'recording-consent'
   | 'recording-decline'
   | 'recording-purpose'

@@ -1,10 +1,40 @@
 import { describe, it, expect, vi } from 'vitest'
-import { InterviewRecorder, saveRecording } from '../lib/recorder'
+import { InterviewRecorder, saveRecording, downloadRecording } from '../lib/recorder'
 
 describe('InterviewRecorder & Local Save System', () => {
   it('instantiates InterviewRecorder cleanly with inactive state', () => {
     const recorder = new InterviewRecorder()
     expect(recorder).toBeDefined()
+    expect(recorder.isPaused()).toBe(false)
+    expect(recorder.pause()).toBe(false)
+    expect(recorder.resume()).toBe(false)
+  })
+
+  it('downloadRecording creates object URL and triggers anchor click', () => {
+    const testBlob = new Blob(['mp4-test-data'], { type: 'video/mp4' })
+    const filename = 'InterviewCapture_test.mp4'
+
+    const originalCreateObjectUrl = URL.createObjectURL
+    const originalRevokeObjectUrl = URL.revokeObjectURL
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-mp4')
+    URL.revokeObjectURL = vi.fn()
+
+    const clickSpy = vi.fn()
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const el = originalCreateElement(tagName)
+      if (tagName === 'a') {
+        el.click = clickSpy
+      }
+      return el
+    })
+
+    downloadRecording(testBlob, filename)
+    expect(clickSpy).toHaveBeenCalled()
+
+    URL.createObjectURL = originalCreateObjectUrl
+    URL.revokeObjectURL = originalRevokeObjectUrl
+    vi.restoreAllMocks()
   })
 
   it('rejects stopping when there is no active recording', async () => {

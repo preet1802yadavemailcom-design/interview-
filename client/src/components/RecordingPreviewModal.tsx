@@ -16,6 +16,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import type { RecorderResult } from '../lib/recorder'
+import { downloadRecording } from '../lib/recorder'
 
 interface RecordingPreviewModalProps {
   isOpen: boolean
@@ -162,10 +163,32 @@ export default function RecordingPreviewModal({
           <div>
             <strong style={{ color: '#ffffff' }}>Universal Playback Guide:</strong> Your video contains embedded high-precision duration and seek headers.
             <div style={{ marginTop: 4, color: '#94a3b8' }}>
-              • <strong style={{ color: '#e2e8f0' }}>Best Players on Windows:</strong> Right-click file &rarr; <em>Open With &rarr; Google Chrome, Microsoft Edge, or VLC</em>.
+              • <strong style={{ color: '#e2e8f0' }}>Zero-Issue Playback on Windows:</strong> Click <em>"Open in Tab"</em> below to watch full-screen now, or right-click downloaded file &rarr; <em>Open With &rarr; Google Chrome, Edge, or VLC</em>.
               <br />
-              • <strong style={{ color: '#e2e8f0' }}>Windows Media Player 0x80070002:</strong> Caused when Windows lacks VP9 codecs. Use Chrome/Edge/VLC or install free <em>"Web Media Extensions"</em> from Microsoft Store.
+              • <strong style={{ color: '#e2e8f0' }}>Windows Media Player 0x80070002 Fix:</strong> Caused when Windows lacks the native VP9 codec. Click below to install free from Microsoft Store:
             </div>
+            <a
+              href="ms-windows-store://pdp/?ProductId=9N4D0MSFG09T"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 8,
+                padding: '5px 12px',
+                background: 'rgba(56, 189, 248, 0.16)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                borderRadius: 6,
+                color: '#38bdf8',
+                fontSize: 11.5,
+                fontWeight: 600,
+                textDecoration: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <ExternalLink size={12} /> Install Free VP9 Codec (Microsoft Store)
+            </a>
           </div>
         </div>
 
@@ -190,9 +213,9 @@ export default function RecordingPreviewModal({
         )}
 
         {/* Actions Row */}
-        <div className="preview-actions-row">
+        <div className="preview-actions-row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <button className="btn-secondary-dark btn-discard" onClick={onDiscard} disabled={isSaving}>
-            <Trash2 size={16} /> Discard
+            <Trash2 size={15} /> Discard
           </button>
           {previewUrl && (
             <button
@@ -200,13 +223,24 @@ export default function RecordingPreviewModal({
               className="btn-secondary-dark"
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               onClick={() => window.open(previewUrl, '_blank')}
-              title="Open video player in high-res full tab"
+              title="Watch full-screen video in new tab immediately"
             >
               <ExternalLink size={15} /> Open in Tab
             </button>
           )}
+          {result && (
+            <button
+              type="button"
+              className="btn-secondary-dark"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+              onClick={() => downloadRecording(result.blob, result.filename)}
+              title="Direct clean download into your Downloads folder"
+            >
+              <Download size={15} /> Direct Download
+            </button>
+          )}
           <button className="btn-primary-orange btn-save-device" onClick={onSave} disabled={isSaving}>
-            <Download size={16} /> {isSaving ? 'Saving…' : 'Save to My Device'}
+            <Download size={16} /> {isSaving ? 'Saving…' : 'Save As…'}
           </button>
         </div>
       </div>

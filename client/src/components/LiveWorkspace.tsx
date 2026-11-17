@@ -36,6 +36,8 @@ import {
   Lock,
   Search,
   Tv,
+  Play,
+  Pause,
 } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 import AudioWaveform from './AudioWaveform'
@@ -52,7 +54,9 @@ interface LiveWorkspaceProps {
   remotePresent: boolean
   connected: boolean
   recording: boolean
+  isRecordingPaused?: boolean
   recordingSeconds: number
+  onTogglePauseRecording?: () => void
   micOn: boolean
   cameraOn: boolean
   audioPlaybackBlocked: boolean
@@ -98,7 +102,9 @@ export default function LiveWorkspace({
   remotePresent,
   connected,
   recording,
+  isRecordingPaused = false,
   recordingSeconds,
+  onTogglePauseRecording,
   micOn,
   cameraOn,
   audioPlaybackBlocked,
@@ -268,10 +274,25 @@ export default function LiveWorkspace({
             </div>
 
             {recording ? (
-              <div className="rec-status-pill">
-                <span className="rec-dot-pulsing" />
-                <span>Recording {formatTime(recordingSeconds)}</span>
-              </div>
+              isRecordingPaused ? (
+                <div
+                  className="rec-status-pill"
+                  style={{
+                    background: 'rgba(234, 179, 8, 0.16)',
+                    borderColor: 'rgba(234, 179, 8, 0.45)',
+                    color: '#fef08a',
+                  }}
+                  title="Recording is paused. Click Resume in toolbar to continue."
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#eab308', display: 'inline-block' }} />
+                  <span>Paused {formatTime(recordingSeconds)}</span>
+                </div>
+              ) : (
+                <div className="rec-status-pill">
+                  <span className="rec-dot-pulsing" />
+                  <span>Recording {formatTime(recordingSeconds)}</span>
+                </div>
+              )
             ) : (
               <div
                 style={{
@@ -457,6 +478,33 @@ export default function LiveWorkspace({
                 >
                   Enable Audio
                 </button>
+              </div>
+            )}
+
+            {/* Recording Paused Floating Indicator */}
+            {recording && isRecordingPaused && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(234, 179, 8, 0.95)',
+                  color: '#0a0d16',
+                  padding: '7px 18px',
+                  borderRadius: 999,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.6)',
+                  zIndex: 40,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  letterSpacing: 0.3,
+                }}
+              >
+                <Pause size={14} fill="#0a0d16" />
+                <span>Recording is PAUSED • Click Resume to continue</span>
               </div>
             )}
 
@@ -817,6 +865,28 @@ export default function LiveWorkspace({
                   )}
                   <span>{recording ? 'Stop Recording' : 'Record'}</span>
                 </div>
+
+                {/* Pause / Resume Recording Control Button */}
+                {recording && (
+                  <div className="dock-item-labeled">
+                    <button
+                      type="button"
+                      className={`dock-circle-btn ${isRecordingPaused ? 'recording-paused-btn' : ''}`}
+                      onClick={onTogglePauseRecording}
+                      title={isRecordingPaused ? 'Resume Recording' : 'Pause Recording'}
+                      style={{
+                        borderColor: isRecordingPaused ? '#eab308' : '#94a3b8',
+                        color: isRecordingPaused ? '#eab308' : '#ffffff',
+                        background: isRecordingPaused ? 'rgba(234, 179, 8, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+                      }}
+                    >
+                      {isRecordingPaused ? <Play size={18} fill="#eab308" /> : <Pause size={18} fill="#ffffff" />}
+                    </button>
+                    <span style={{ color: isRecordingPaused ? '#eab308' : undefined, fontWeight: isRecordingPaused ? 600 : undefined }}>
+                      {isRecordingPaused ? 'Resume' : 'Pause'}
+                    </span>
+                  </div>
+                )}
 
                 {/* Raise Hand */}
                 <div className="dock-item-labeled">
