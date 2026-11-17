@@ -163,32 +163,54 @@ export default function RecordingPreviewModal({
           <div>
             <strong style={{ color: '#ffffff' }}>Universal Playback Guide:</strong> Your video contains embedded high-precision duration and seek headers.
             <div style={{ marginTop: 4, color: '#94a3b8' }}>
-              • <strong style={{ color: '#e2e8f0' }}>Zero-Issue Playback on Windows:</strong> Click <em>"Open in Tab"</em> below to watch full-screen now, or right-click downloaded file &rarr; <em>Open With &rarr; Google Chrome, Edge, or VLC</em>.
+              • <strong style={{ color: '#e2e8f0' }}>Zero-Issue Playback:</strong> Click <em>"Open in Tab"</em> below to watch immediately in-browser, or right-click downloaded file &rarr; <em>Open With &rarr; Google Chrome, Edge, or VLC</em>.
               <br />
-              • <strong style={{ color: '#e2e8f0' }}>Windows Media Player 0x80070002 Fix:</strong> Caused when Windows lacks the native VP9 codec. Click below to install free from Microsoft Store:
+              • <strong style={{ color: '#e2e8f0' }}>Windows Media Player 0x80070002 Fix:</strong> Caused when Windows 11 lacks Microsoft's native WebM/VP9 extensions. Install free from Microsoft Store with 1 click:
             </div>
-            <a
-              href="ms-windows-store://pdp/?ProductId=9N4D0MSFG09T"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                marginTop: 8,
-                padding: '5px 12px',
-                background: 'rgba(56, 189, 248, 0.16)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
-                borderRadius: 6,
-                color: '#38bdf8',
-                fontSize: 11.5,
-                fontWeight: 600,
-                textDecoration: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <ExternalLink size={12} /> Install Free VP9 Codec (Microsoft Store)
-            </a>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              <a
+                href="ms-windows-store://pdp/?ProductId=9N4D0MSFG09T"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 12px',
+                  background: 'rgba(56, 189, 248, 0.16)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  borderRadius: 6,
+                  color: '#38bdf8',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={12} /> Install VP9 Extension
+              </a>
+              <a
+                href="ms-windows-store://pdp/?ProductId=9N5TDP8VCMHS"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 12px',
+                  background: 'rgba(56, 189, 248, 0.16)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  borderRadius: 6,
+                  color: '#38bdf8',
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <ExternalLink size={12} /> Install Web Media Extension
+              </a>
+            </div>
           </div>
         </div>
 

@@ -72,6 +72,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user')
   const [screenShareAllowedForAll, setScreenShareAllowedForAll] = useState(true)
   const [isRoomLocked, setIsRoomLocked] = useState(false)
   const [participants, setParticipants] = useState<RoomMember[]>([])
@@ -173,7 +174,7 @@ export default function App() {
           width: { ideal: 1920, max: 3840, min: 1280 },
           height: { ideal: 1080, max: 2160, min: 720 },
           frameRate: { ideal: 30, max: 60 },
-          facingMode: 'user',
+          facingMode: facingMode,
         },
         audio: {
           echoCancellation: true,
@@ -191,7 +192,7 @@ export default function App() {
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 30 },
-          facingMode: 'user',
+          facingMode: facingMode,
         },
         audio: {
           echoCancellation: true,
@@ -213,6 +214,67 @@ export default function App() {
     setCameraOn(withCamera)
     setMicOn(withMic)
     return stream
+  }
+
+  async function handleFlipCamera() {
+    const nextMode = facingMode === 'user' ? 'environment' : 'user'
+    setFacingMode(nextMode)
+
+    if (!localStreamRef.current) return
+    const currentVideoTrack = localStreamRef.current.getVideoTracks()[0]
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: nextMode },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+        },
+      })
+      const newVideoTrack = newStream.getVideoTracks()[0]
+      if (newVideoTrack) {
+        newVideoTrack.enabled = cameraOn
+        if (currentVideoTrack) {
+          currentVideoTrack.stop()
+          localStreamRef.current.removeTrack(currentVideoTrack)
+        }
+        localStreamRef.current.addTrack(newVideoTrack)
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current
+        }
+
+        if (pcRef.current) {
+          const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+          if (sender) {
+            void sender.replaceTrack(newVideoTrack)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Camera] Ideal flip failed, falling back to basic facingMode:', err)
+      try {
+        const simpleStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: nextMode },
+        })
+        const newTrack = simpleStream.getVideoTracks()[0]
+        if (newTrack) {
+          newTrack.enabled = cameraOn
+          if (currentVideoTrack) {
+            currentVideoTrack.stop()
+            localStreamRef.current.removeTrack(currentVideoTrack)
+          }
+          localStreamRef.current.addTrack(newTrack)
+          if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current
+          if (pcRef.current) {
+            const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+            if (sender) void sender.replaceTrack(newTrack)
+          }
+        }
+      } catch (fallbackErr) {
+        console.error('[Camera] Simple flip fallback also failed:', fallbackErr)
+      }
+    }
   }
 
   function resetPeer() {
@@ -910,6 +972,8 @@ export default function App() {
           filterAdjustments={filterAdjustments}
           onSelectFilter={setActiveFilterId}
           onUpdateAdjustments={setFilterAdjustments}
+          facingMode={facingMode}
+          onFlipCamera={handleFlipCamera}
         />
       )}
 

@@ -361,7 +361,7 @@ export class InterviewRecorder {
         const hasScreenAudio = this.screenHasAudio
         const sizeBytes = finalBlob.size
 
-        const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+        const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19).replace('T', '_')
         const filename = `InterviewCapture_${dateStamp}.${extension}`
 
         this.cleanup()
@@ -471,8 +471,8 @@ export function downloadRecording(blob: Blob, filename: string): void {
 
 /**
  * Saves a recorded video file locally.
- * Prefers File System Access API (showSaveFilePicker) on Chromium browsers.
- * Seamlessly falls back to anchor download if picker is unavailable, unsupported, or rejected.
+ * Supports showSaveFilePicker when available with AbortError cancellation detection,
+ * and gracefully uses direct HTML5 anchor download for maximum cross-platform compatibility.
  */
 export async function saveRecording(blob: Blob, filename: string): Promise<'saved' | 'downloaded' | 'cancelled'> {
   const pickerWindow = window as SavePickerWindow
@@ -500,12 +500,10 @@ export async function saveRecording(blob: Blob, filename: string): Promise<'save
       if (err instanceof DOMException && err.name === 'AbortError') {
         return 'cancelled'
       }
-      // If permission is denied or picker is blocked, gracefully fall through to standard download
       console.warn('[Recorder] showSaveFilePicker failed, using fallback download anchor:', err)
     }
   }
 
-  // Fallback anchor download
   downloadRecording(blob, filename)
   return 'downloaded'
 }

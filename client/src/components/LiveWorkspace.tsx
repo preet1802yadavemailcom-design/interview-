@@ -38,6 +38,8 @@ import {
   Tv,
   Play,
   Pause,
+  SwitchCamera,
+  X,
 } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 import AudioWaveform from './AudioWaveform'
@@ -91,6 +93,8 @@ interface LiveWorkspaceProps {
   filterAdjustments?: FilterAdjustments
   onSelectFilter?: (id: string) => void
   onUpdateAdjustments?: (adj: FilterAdjustments) => void
+  facingMode?: 'user' | 'environment'
+  onFlipCamera?: () => void
 }
 
 export default function LiveWorkspace({
@@ -139,6 +143,8 @@ export default function LiveWorkspace({
   filterAdjustments = { brightness: 100, contrast: 100, saturation: 100 },
   onSelectFilter = () => {},
   onUpdateAdjustments = () => {},
+  facingMode = 'user',
+  onFlipCamera,
 }: LiveWorkspaceProps) {
   const [activeTool, setActiveTool] = useState<'recording' | 'participants' | 'chat' | 'notes' | 'mixer' | 'screen' | 'info' | 'filters'>('recording')
   const [handRaised, setHandRaised] = useState(false)
@@ -146,6 +152,33 @@ export default function LiveWorkspace({
   const [notesText, setNotesText] = useState('')
   const [reactions, setReactions] = useState<FloatingReaction[]>([])
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= 768)
+  const [showControls, setShowControls] = useState<boolean>(true)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const handleStageTap = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isMobile) return
+    const target = e.target as HTMLElement
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('textarea') ||
+      target.closest('.tile-hover-toolbar') ||
+      target.closest('.mobile-bottom-sheet') ||
+      target.closest('.mobile-floating-dock')
+    ) {
+      return
+    }
+    setShowControls(prev => !prev)
+  }
   const [layoutMode, setLayoutMode] = useState<'grid' | 'pip'>('grid')
   const [hostVolume, setHostVolume] = useState(100)
   const [guestVolume, setGuestVolume] = useState(100)
@@ -232,802 +265,8 @@ export default function LiveWorkspace({
     URL.revokeObjectURL(url)
   }
 
-  return (
-    <div className="workspace-shell">
-      {/* Floating Reaction Animation Overlay */}
-      <ReactionOverlay reactions={reactions} />
-
-      {/* Top Badge matching 04_Live_Interview_Workspace.png */}
-      <div style={{ padding: '16px 28px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span className="modal-step-badge">04 Live Interview & Recording (Main Workspace)</span>
-
-        {/* Network Quality Indicator */}
-        <div className="network-quality-pill">
-          <span className="network-green-dot" />
-          <span>HD 1080p • 30fps • 24ms</span>
-        </div>
-      </div>
-
-      {/* Main Workspace Frame */}
-      <div className={`workspace-main-frame ${isTheaterMode ? 'theater-mode-active' : ''}`}>
-        {/* Floating Theater Mode Exit Button */}
-        {isTheaterMode && (
-          <button
-            type="button"
-            className="theater-exit-pill"
-            onClick={() => setIsTheaterMode(false)}
-            title="Exit Theater Immersion Mode (or press Esc)"
-          >
-            <Minimize2 size={14} />
-            <span>Exit Theater Mode (Esc)</span>
-          </button>
-        )}
-
-        {/* Workspace Top Header Bar */}
-        <header className="workspace-top-bar">
-          <div className="workspace-top-left">
-            <BrandLogo size={20} fontSize={15} />
-
-            <div className="meeting-title-pill">
-              <Calendar size={13} style={{ color: '#ff6b00' }} />
-              <span>{meetingTitle || 'Frontend Developer Interview'}</span>
-            </div>
-
-            {recording ? (
-              isRecordingPaused ? (
-                <div
-                  className="rec-status-pill"
-                  style={{
-                    background: 'rgba(234, 179, 8, 0.16)',
-                    borderColor: 'rgba(234, 179, 8, 0.45)',
-                    color: '#fef08a',
-                  }}
-                  title="Recording is paused. Click Resume in toolbar to continue."
-                >
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#eab308', display: 'inline-block' }} />
-                  <span>Paused {formatTime(recordingSeconds)}</span>
-                </div>
-              ) : (
-                <div className="rec-status-pill">
-                  <span className="rec-dot-pulsing" />
-                  <span>Recording {formatTime(recordingSeconds)}</span>
-                </div>
-              )
-            ) : (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#94a3b8',
-                  background: 'rgba(255,255,255,0.06)',
-                  padding: '5px 12px',
-                  borderRadius: 999,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#64748b' }} />
-                <span>Ready to record</span>
-              </div>
-            )}
-          </div>
-
-          <div className="workspace-top-right">
-            {/* Layout Mode Dropdown Menu */}
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className="layout-mode-btn"
-                onClick={() => setShowLayoutMenu(prev => !prev)}
-                title="Switch Layout Mode (Grid, Spotlight, PiP, Theater)"
-              >
-                {spotlightTile ? <Pin size={14} color="#ff6b00" /> : layoutMode === 'pip' ? <Maximize2 size={14} /> : <LayoutGrid size={14} />}
-                <span>
-                  {spotlightTile ? 'Spotlight' : layoutMode === 'pip' ? 'PiP Mode' : 'Grid View'}
-                </span>
-              </button>
-
-              {showLayoutMenu && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: 0,
-                    background: '#0d1322',
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: 12,
-                    boxShadow: '0 12px 36px rgba(0,0,0,0.7)',
-                    padding: '6px',
-                    zIndex: 100,
-                    minWidth: 185,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 3,
-                  }}
-                >
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      background: layoutMode === 'grid' && !spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
-                      color: layoutMode === 'grid' && !spotlightTile ? '#ff6b00' : '#e2e8f0',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      textAlign: 'left',
-                    }}
-                    onClick={() => {
-                      setLayoutMode('grid')
-                      setSpotlightTile(null)
-                      setShowLayoutMenu(false)
-                    }}
-                  >
-                    <LayoutGrid size={14} /> Side-by-Side Grid
-                  </button>
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      background: layoutMode === 'pip' && !spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
-                      color: layoutMode === 'pip' && !spotlightTile ? '#ff6b00' : '#e2e8f0',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      textAlign: 'left',
-                    }}
-                    onClick={() => {
-                      setLayoutMode('pip')
-                      setSpotlightTile(null)
-                      setShowLayoutMenu(false)
-                    }}
-                  >
-                    <Maximize2 size={14} /> Picture-in-Picture
-                  </button>
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      background: spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
-                      color: spotlightTile ? '#ff6b00' : '#e2e8f0',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      textAlign: 'left',
-                    }}
-                    onClick={() => {
-                      setSpotlightTile(spotlightTile ? null : 'remote')
-                      setShowLayoutMenu(false)
-                    }}
-                  >
-                    <Pin size={14} /> Spotlight Speaker
-                  </button>
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      background: isTheaterMode ? 'rgba(255,107,0,0.18)' : 'transparent',
-                      color: isTheaterMode ? '#ff6b00' : '#e2e8f0',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      textAlign: 'left',
-                    }}
-                    onClick={() => {
-                      setIsTheaterMode(true)
-                      setShowLayoutMenu(false)
-                    }}
-                  >
-                    <Tv size={14} /> Theater Immersion
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="pill-stat" title="Up to 100 participants supported in this room">
-              <Users size={14} /> <span>{participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)} / 100</span>
-            </div>
-
-            {/* 3 Green vertical bars */}
-            <span style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 14 }}>
-              <span style={{ width: 3, height: 6, background: '#10b981', borderRadius: 1 }}></span>
-              <span style={{ width: 3, height: 10, background: '#10b981', borderRadius: 1 }}></span>
-              <span style={{ width: 3, height: 14, background: '#10b981', borderRadius: 1 }}></span>
-            </span>
-
-            <button className="action-icon-btn" onClick={onCopyInvite} title="Copy invite link">
-              {copiedInvite ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
-            </button>
-
-            <MoreHorizontal
-              size={16}
-              style={{ color: '#94a3b8', cursor: 'pointer' }}
-              onClick={() => setActiveTool('info')}
-            />
-          </div>
-        </header>
-
-        {/* Workspace Body: Dual Stage + Right Sidebar */}
-        <div className="workspace-body-layout">
-          {/* Main Video Stage Area */}
-          <main className="workspace-stage-area">
-            {audioPlaybackBlocked && (
-              <div className="audio-blocked-banner">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Headphones size={16} /> Browser autoplay policy blocked participant audio.
-                </div>
-                <button
-                  className="btn-primary-orange"
-                  style={{ padding: '6px 14px', fontSize: 12 }}
-                  onClick={onEnableAudio}
-                >
-                  Enable Audio
-                </button>
-              </div>
-            )}
-
-            {/* Recording Paused Floating Indicator */}
-            {recording && isRecordingPaused && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 16,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: 'rgba(234, 179, 8, 0.95)',
-                  color: '#0a0d16',
-                  padding: '7px 18px',
-                  borderRadius: 999,
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  boxShadow: '0 6px 20px rgba(0,0,0,0.6)',
-                  zIndex: 40,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  letterSpacing: 0.3,
-                }}
-              >
-                <Pause size={14} fill="#0a0d16" />
-                <span>Recording is PAUSED • Click Resume to continue</span>
-              </div>
-            )}
-
-            {/* Live Screen Share Stage View OR Dual Video Grid */}
-            {isScreenSharing ? (
-              <div className="screen-share-stage-container">
-                <video
-                  ref={screenVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="screen-share-video-elem"
-                />
-                {/* Floating participant webcams in PiP dock */}
-                <div className="screen-share-pip-dock">
-                  <div className="screen-share-pip-item local-video-container">
-                    <video
-                      ref={localVideoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      style={{ filter: activeFilterCss }}
-                    />
-                    <div className="participant-label-pill" style={{ bottom: 6, left: 6, fontSize: 10, padding: '3px 8px' }}>
-                      <span>👑 {localName || 'You'}</span>
-                    </div>
-                  </div>
-                  {remotePresent && connected && (
-                    <div className="screen-share-pip-item">
-                      <video
-                        ref={remoteVideoRef}
-                        autoPlay
-                        playsInline
-                      />
-                      <div className="participant-label-pill" style={{ bottom: 6, left: 6, fontSize: 10, padding: '3px 8px' }}>
-                        <span>🎙 {remoteName || 'Guest'}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div
-                className={`video-stage-grid ${layoutMode === 'pip' ? 'layout-pip-mode' : ''} ${
-                  spotlightTile ? 'layout-spotlight-mode' : ''
-                }`}
-              >
-                {/* Local Participant (Interviewer / You) */}
-                <div
-                  ref={localContainerRef}
-                  className={`video-container local-video-container ${
-                    layoutMode === 'pip' && spotlightTile !== 'local' ? `pip-corner-${pipCorner}` : ''
-                  } ${spotlightTile === 'local' ? 'spotlight-primary' : ''}`}
-                  style={{
-                    order: isTilesSwapped ? 2 : 1,
-                  }}
-                >
-                  {/* Interactive Tile Hover Action Bar */}
-                  <div className="tile-hover-toolbar">
-                    {/* Rotate 90° */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${localRotation > 0 ? 'active' : ''}`}
-                      onClick={() => setLocalRotation(r => (r + 90) % 360)}
-                      title={`Rotate Camera (Current: ${localRotation}°)`}
-                    >
-                      <RotateCw size={13} />
-                    </button>
-                    {/* Mirror Flip */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${isLocalMirrored ? 'active' : ''}`}
-                      onClick={() => setIsLocalMirrored(m => !m)}
-                      title={isLocalMirrored ? 'Mirror Reflection (ON)' : 'Mirror Reflection (OFF)'}
-                    >
-                      <FlipHorizontal size={13} />
-                    </button>
-                    {/* Spotlight / Pin */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${spotlightTile === 'local' ? 'active' : ''}`}
-                      onClick={() => setSpotlightTile(spotlightTile === 'local' ? null : 'local')}
-                      title={spotlightTile === 'local' ? 'Unpin Local Video' : 'Spotlight / Maximize You'}
-                    >
-                      <Pin size={13} />
-                    </button>
-                    {/* Swap Positions */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${isTilesSwapped ? 'active' : ''}`}
-                      onClick={() => setIsTilesSwapped(s => !s)}
-                      title="Swap Left / Right Video Positions"
-                    >
-                      <ArrowLeftRight size={13} />
-                    </button>
-                    {/* Move PiP Corner */}
-                    {layoutMode === 'pip' && (
-                      <button
-                        type="button"
-                        className="tile-action-btn"
-                        onClick={cyclePipCorner}
-                        title={`Move PiP Corner (${pipCorner})`}
-                      >
-                        <Move size={13} />
-                      </button>
-                    )}
-                    {/* Native Fullscreen */}
-                    <button
-                      type="button"
-                      className="tile-action-btn"
-                      onClick={() => handleFullscreen(localContainerRef)}
-                      title="Fullscreen Video Tile"
-                    >
-                      <Maximize2 size={13} />
-                    </button>
-                  </div>
-
-                  <video
-                    ref={localVideoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    style={{
-                      display: cameraOn ? 'block' : 'none',
-                      filter: activeFilterCss,
-                      transform: `${isLocalMirrored ? 'scaleX(-1)' : 'scaleX(1)'} ${
-                        localRotation ? `rotate(${localRotation}deg)` : ''
-                      }`,
-                      transition: 'transform 0.25s ease',
-                    }}
-                  />
-                  {!cameraOn && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#0e1424' }}>
-                      <div style={{ width: 68, height: 68, borderRadius: '50%', background: '#ff6b00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: '#fff', boxShadow: '0 0 20px rgba(255,107,0,0.4)' }}>
-                        {(localName || 'P').charAt(0).toUpperCase()}
-                      </div>
-                      <span style={{ fontSize: 13, color: '#94a3b8', marginTop: 10, fontWeight: 500 }}>Camera Off</span>
-                    </div>
-                  )}
-                  {/* Active Filter Pill Badge */}
-                  <button
-                    type="button"
-                    className="video-filter-pill-trigger"
-                    onClick={() => setActiveTool(activeTool === 'filters' ? 'recording' : 'filters')}
-                    title="Change Ultra HD Camera Filter"
-                  >
-                    <Sparkles size={11} color="#06b6d4" />
-                    <span>{(VIDEO_FILTERS.find(f => f.id === activeFilterId) || VIDEO_FILTERS[0]).name.split(' ')[0]}</span>
-                  </button>
-
-                  <div className="participant-label-pill">
-                    <span style={{ color: '#f59e0b' }}>👑</span>
-                    <span>{localName || 'Preet Yadav'} (You)</span>
-                    <AudioWaveform active={micOn} color="#ff6b00" height={13} />
-                  </div>
-                </div>
-
-                {/* Remote Participant (Real video when connected, Clean waiting radar when alone) */}
-                <div
-                  ref={remoteContainerRef}
-                  className={`video-container remote-video ${
-                    layoutMode === 'pip' && spotlightTile === 'local' ? `pip-corner-${pipCorner}` : ''
-                  } ${spotlightTile === 'remote' ? 'spotlight-primary' : ''}`}
-                  style={{
-                    order: isTilesSwapped ? 1 : 2,
-                  }}
-                >
-                  {/* Interactive Tile Hover Action Bar */}
-                  <div className="tile-hover-toolbar">
-                    {/* Rotate 90° */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${remoteRotation > 0 ? 'active' : ''}`}
-                      onClick={() => setRemoteRotation(r => (r + 90) % 360)}
-                      title={`Rotate Guest Camera (Current: ${remoteRotation}°)`}
-                    >
-                      <RotateCw size={13} />
-                    </button>
-                    {/* Spotlight / Pin */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${spotlightTile === 'remote' ? 'active' : ''}`}
-                      onClick={() => setSpotlightTile(spotlightTile === 'remote' ? null : 'remote')}
-                      title={spotlightTile === 'remote' ? 'Unpin Guest' : 'Spotlight / Maximize Guest'}
-                    >
-                      <Pin size={13} />
-                    </button>
-                    {/* Swap Positions */}
-                    <button
-                      type="button"
-                      className={`tile-action-btn ${isTilesSwapped ? 'active' : ''}`}
-                      onClick={() => setIsTilesSwapped(s => !s)}
-                      title="Swap Left / Right Video Positions"
-                    >
-                      <ArrowLeftRight size={13} />
-                    </button>
-                    {/* Move PiP Corner */}
-                    {layoutMode === 'pip' && (
-                      <button
-                        type="button"
-                        className="tile-action-btn"
-                        onClick={cyclePipCorner}
-                        title={`Move PiP Corner (${pipCorner})`}
-                      >
-                        <Move size={13} />
-                      </button>
-                    )}
-                    {/* Native Fullscreen */}
-                    <button
-                      type="button"
-                      className="tile-action-btn"
-                      onClick={() => handleFullscreen(remoteContainerRef)}
-                      title="Fullscreen Video Tile"
-                    >
-                      <Maximize2 size={13} />
-                    </button>
-                  </div>
-
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay
-                    playsInline
-                    style={{
-                      display: remotePresent && connected ? 'block' : 'none',
-                      transform: remoteRotation ? `rotate(${remoteRotation}deg)` : 'none',
-                      transition: 'transform 0.25s ease',
-                    }}
-                  />
-                  {(!remotePresent || !connected) && (
-                    <div className="waiting-participant-card">
-                      <div className="waiting-pulse-rings">
-                        <div className="pulse-ring ring-1" />
-                        <div className="pulse-ring ring-2" />
-                        <div className="waiting-radar-center">
-                          <Users size={24} color="#ff6b00" />
-                        </div>
-                      </div>
-                      <div className="waiting-title">Waiting for participants…</div>
-                      <div className="waiting-subtitle">
-                        Room is ready. Share the invite link with up to 100 participants to start.
-                      </div>
-                      <button
-                        type="button"
-                        className="waiting-copy-btn"
-                        onClick={onCopyInvite}
-                      >
-                        {copiedInvite ? (
-                          <>
-                            <Check size={14} color="#10b981" /> Link Copied!
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={14} /> Copy Room Link
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  {remotePresent && connected && (
-                    <div className="participant-label-pill">
-                      <span>🎙</span>
-                      <span>{remoteName || 'Guest'}</span>
-                      <AudioWaveform active={true} color="#10b981" height={13} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Floating Dock Toolbar */}
-            <div className="floating-dock-toolbar">
-              <div className="dock-actions-group">
-                {/* Mic */}
-                <div className="dock-item-labeled">
-                  <button
-                    className={`dock-circle-btn ${!micOn ? 'muted' : ''}`}
-                    onClick={onToggleMic}
-                    title={micOn ? 'Mute Mic' : 'Unmute Mic'}
-                  >
-                    {micOn ? <Mic size={19} /> : <MicOff size={19} />}
-                  </button>
-                  <span>{micOn ? 'Mic' : 'Muted'}</span>
-                </div>
-
-                {/* Camera */}
-                <div className="dock-item-labeled">
-                  <button
-                    className={`dock-circle-btn ${!cameraOn ? 'muted' : ''}`}
-                    onClick={onToggleCamera}
-                    title={cameraOn ? 'Turn Camera Off' : 'Turn Camera On'}
-                  >
-                    {cameraOn ? <Video size={19} /> : <VideoOff size={19} />}
-                  </button>
-                  <span>{cameraOn ? 'Camera' : 'Off'}</span>
-                </div>
-
-                {/* Ultra HD Filters Dock Button */}
-                <div className="dock-item-labeled">
-                  <button
-                    className={`dock-circle-btn ${activeTool === 'filters' ? 'active' : ''}`}
-                    onClick={() => setActiveTool(activeTool === 'filters' ? 'recording' : 'filters')}
-                    title="Camera Ultra HD Filters"
-                    style={{ borderColor: activeTool === 'filters' ? '#06b6d4' : undefined }}
-                  >
-                    <Sparkles size={18} style={{ color: '#06b6d4' }} />
-                  </button>
-                  <span>Filters</span>
-                </div>
-
-                {/* Live Screen Share Toggle */}
-                <div className="dock-item-labeled">
-                  <button
-                    className={`dock-circle-btn ${isScreenSharing ? 'sharing-screen' : ''}`}
-                    onClick={() => {
-                      if (isScreenSharing) {
-                        onToggleScreenShare?.()
-                      } else if (isHost || screenShareAllowedForAll) {
-                        onToggleScreenShare?.()
-                      } else {
-                        alert(
-                          'Screen sharing is currently restricted by the host. Please ask the meeting host to enable participant screen sharing in Host Controls.'
-                        )
-                      }
-                    }}
-                    title={
-                      isScreenSharing
-                        ? 'Stop Screen Share'
-                        : isHost || screenShareAllowedForAll
-                        ? 'Share Your Screen (HD + Audio)'
-                        : 'Screen sharing restricted by host'
-                    }
-                  >
-                    {isScreenSharing ? <MonitorOff size={19} color="#ef4444" /> : <MonitorUp size={19} />}
-                  </button>
-                  <span style={{ color: isScreenSharing ? '#ef4444' : undefined, fontWeight: isScreenSharing ? 600 : undefined }}>
-                    {isScreenSharing ? 'Stop Share' : 'Share Screen'}
-                  </span>
-                </div>
-
-                {/* Prominent Recording Control Button */}
-                <div className="dock-item-labeled">
-                  {recording ? (
-                    <button
-                      className="dock-rec-stop-btn"
-                      onClick={onStopRecording}
-                      title="Stop Recording"
-                    >
-                      <span className="dock-rec-stop-square" />
-                    </button>
-                  ) : (
-                    <button
-                      className="dock-rec-start-btn"
-                      onClick={onOpenRecordingModal}
-                      title="Start Recording"
-                    >
-                      <Radio size={20} />
-                    </button>
-                  )}
-                  <span>{recording ? 'Stop Recording' : 'Record'}</span>
-                </div>
-
-                {/* Pause / Resume Recording Control Button */}
-                {recording && (
-                  <div className="dock-item-labeled">
-                    <button
-                      type="button"
-                      className={`dock-circle-btn ${isRecordingPaused ? 'recording-paused-btn' : ''}`}
-                      onClick={onTogglePauseRecording}
-                      title={isRecordingPaused ? 'Resume Recording' : 'Pause Recording'}
-                      style={{
-                        borderColor: isRecordingPaused ? '#eab308' : '#94a3b8',
-                        color: isRecordingPaused ? '#eab308' : '#ffffff',
-                        background: isRecordingPaused ? 'rgba(234, 179, 8, 0.22)' : 'rgba(255, 255, 255, 0.08)',
-                      }}
-                    >
-                      {isRecordingPaused ? <Play size={18} fill="#eab308" /> : <Pause size={18} fill="#ffffff" />}
-                    </button>
-                    <span style={{ color: isRecordingPaused ? '#eab308' : undefined, fontWeight: isRecordingPaused ? 600 : undefined }}>
-                      {isRecordingPaused ? 'Resume' : 'Pause'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Raise Hand */}
-                <div className="dock-item-labeled">
-                  <button
-                    className={`dock-circle-btn ${handRaised ? 'active' : ''}`}
-                    onClick={() => setHandRaised(!handRaised)}
-                    title="Raise Hand"
-                  >
-                    <Hand size={19} style={{ color: handRaised ? '#ff6b00' : 'inherit' }} />
-                  </button>
-                  <span>Raise Hand</span>
-                </div>
-
-                {/* Interactive Emoji Reactions */}
-                <div className="dock-item-labeled" style={{ position: 'relative' }}>
-                  <button
-                    className="dock-circle-btn"
-                    onClick={() => setShowReactionPicker(!showReactionPicker)}
-                    title="Send Reaction"
-                  >
-                    <Smile size={19} />
-                  </button>
-                  <span>React</span>
-
-                  {showReactionPicker && (
-                    <div className="reaction-picker-popover">
-                      {['👏', '❤️', '🔥', '🚀', '👍', '😂'].map(emoji => (
-                        <button
-                          key={emoji}
-                          className="reaction-emoji-btn"
-                          onClick={() => triggerReaction(emoji)}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* More / Settings */}
-                <div className="dock-item-labeled">
-                  <button
-                    className="dock-circle-btn"
-                    onClick={() => setActiveTool('info')}
-                    title="More Options"
-                  >
-                    <MoreHorizontal size={19} />
-                  </button>
-                  <span>More</span>
-                </div>
-              </div>
-
-              {/* Leave Button */}
-              <button className="dock-leave-btn" onClick={onLeaveMeeting}>
-                <PhoneOff size={15} /> Leave
-              </button>
-            </div>
-          </main>
-
-          {/* Right Sidebar: Meeting Tools (Exact match to 04_Live_Interview_Workspace.png + Live Tabs) */}
-          <aside className="workspace-tools-sidebar">
-            <h3 className="sidebar-tools-title">Meeting Tools</h3>
-
-            <div className="sidebar-tools-list">
-              <button
-                className={`sidebar-tool-item ${activeTool === 'recording' ? 'active' : ''}`}
-                onClick={() => setActiveTool('recording')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="sidebar-rec-dot" /> <span>Recording</span>
-                </div>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'filters' ? 'active' : ''}`}
-                onClick={() => setActiveTool('filters')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Sparkles size={16} color="#06b6d4" /> <span>Camera Filters</span>
-                </div>
-                <span className="sidebar-unread-pill" style={{ background: '#06b6d4' }}>HD</span>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'chat' ? 'active' : ''}`}
-                onClick={() => setActiveTool('chat')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <MessageSquare size={16} /> <span>Chat</span>
-                </div>
-                <span className="sidebar-unread-pill">1</span>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'notes' ? 'active' : ''}`}
-                onClick={() => setActiveTool('notes')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <FileText size={16} /> <span>Interview Notes</span>
-                </div>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'mixer' ? 'active' : ''}`}
-                onClick={() => setActiveTool('mixer')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Sliders size={16} /> <span>Audio Mixer</span>
-                </div>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'participants' ? 'active' : ''}`}
-                onClick={() => setActiveTool('participants')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Users size={16} /> <span>Participants ({participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)})</span>
-                </div>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'screen' ? 'active' : ''}`}
-                onClick={() => setActiveTool('screen')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <MonitorUp size={16} /> <span>Screen Share</span>
-                </div>
-              </button>
-
-              <button
-                className={`sidebar-tool-item ${activeTool === 'info' ? 'active' : ''}`}
-                onClick={() => setActiveTool('info')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Info size={16} /> <span>Meeting Info</span>
-                </div>
-              </button>
-            </div>
-
-            {/* Sidebar Active Panel Content */}
-            <div className="sidebar-tool-content-box">
+  const renderToolContent = () => (
+    <>
               {activeTool === 'recording' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 600 }}>
@@ -1461,8 +700,985 @@ export default function LiveWorkspace({
                   </div>
                 </div>
               )}
+    </>
+  )
+
+  return (
+    <div className="workspace-shell">
+      {/* Floating Reaction Animation Overlay */}
+      <ReactionOverlay reactions={reactions} />
+
+      {/* Top Badge matching 04_Live_Interview_Workspace.png */}
+      <div style={{ padding: '16px 28px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span className="modal-step-badge">04 Live Interview & Recording (Main Workspace)</span>
+
+        {/* Network Quality Indicator */}
+        <div className="network-quality-pill">
+          <span className="network-green-dot" />
+          <span>HD 1080p • 30fps • 24ms</span>
+        </div>
+      </div>
+
+      {/* Main Workspace Frame */}
+      <div className={`workspace-main-frame ${isTheaterMode ? 'theater-mode-active' : ''}`}>
+        {/* Floating Theater Mode Exit Button */}
+        {isTheaterMode && (
+          <button
+            type="button"
+            className="theater-exit-pill"
+            onClick={() => setIsTheaterMode(false)}
+            title="Exit Theater Immersion Mode (or press Esc)"
+          >
+            <Minimize2 size={14} />
+            <span>Exit Theater Mode (Esc)</span>
+          </button>
+        )}
+
+        {/* Workspace Top Header Bar */}
+        <header className={`workspace-top-bar ${isMobile && !showControls ? 'hidden' : ''}`}>
+          <div className="workspace-top-left">
+            <BrandLogo size={20} fontSize={15} />
+
+            <div className="meeting-title-pill">
+              <Calendar size={13} style={{ color: '#ff6b00' }} />
+              <span>{meetingTitle || 'Frontend Developer Interview'}</span>
             </div>
-          </aside>
+
+            {recording ? (
+              isRecordingPaused ? (
+                <div
+                  className="rec-status-pill"
+                  style={{
+                    background: 'rgba(234, 179, 8, 0.16)',
+                    borderColor: 'rgba(234, 179, 8, 0.45)',
+                    color: '#fef08a',
+                  }}
+                  title="Recording is paused. Click Resume in toolbar to continue."
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#eab308', display: 'inline-block' }} />
+                  <span>Paused {formatTime(recordingSeconds)}</span>
+                </div>
+              ) : (
+                <div className="rec-status-pill">
+                  <span className="rec-dot-pulsing" />
+                  <span>Recording {formatTime(recordingSeconds)}</span>
+                </div>
+              )
+            ) : (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: '#94a3b8',
+                  background: 'rgba(255,255,255,0.06)',
+                  padding: '5px 12px',
+                  borderRadius: 999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#64748b' }} />
+                <span>Ready to record</span>
+              </div>
+            )}
+          </div>
+
+          <div className="workspace-top-right">
+            {/* Layout Mode Dropdown Menu */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="layout-mode-btn"
+                onClick={() => setShowLayoutMenu(prev => !prev)}
+                title="Switch Layout Mode (Grid, Spotlight, PiP, Theater)"
+              >
+                {spotlightTile ? <Pin size={14} color="#ff6b00" /> : layoutMode === 'pip' ? <Maximize2 size={14} /> : <LayoutGrid size={14} />}
+                <span>
+                  {spotlightTile ? 'Spotlight' : layoutMode === 'pip' ? 'PiP Mode' : 'Grid View'}
+                </span>
+              </button>
+
+              {showLayoutMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    background: '#0d1322',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 12,
+                    boxShadow: '0 12px 36px rgba(0,0,0,0.7)',
+                    padding: '6px',
+                    zIndex: 100,
+                    minWidth: 185,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                >
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: layoutMode === 'grid' && !spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: layoutMode === 'grid' && !spotlightTile ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setLayoutMode('grid')
+                      setSpotlightTile(null)
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <LayoutGrid size={14} /> Side-by-Side Grid
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: layoutMode === 'pip' && !spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: layoutMode === 'pip' && !spotlightTile ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setLayoutMode('pip')
+                      setSpotlightTile(null)
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <Maximize2 size={14} /> Picture-in-Picture
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: spotlightTile ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setSpotlightTile(spotlightTile ? null : 'remote')
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <Pin size={14} /> Spotlight Speaker
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: isTheaterMode ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: isTheaterMode ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setIsTheaterMode(true)
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <Tv size={14} /> Theater Immersion
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="pill-stat" title="Up to 100 participants supported in this room">
+              <Users size={14} /> <span>{participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)} / 100</span>
+            </div>
+
+            {/* 3 Green vertical bars */}
+            <span style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 14 }}>
+              <span style={{ width: 3, height: 6, background: '#10b981', borderRadius: 1 }}></span>
+              <span style={{ width: 3, height: 10, background: '#10b981', borderRadius: 1 }}></span>
+              <span style={{ width: 3, height: 14, background: '#10b981', borderRadius: 1 }}></span>
+            </span>
+
+            <button className="action-icon-btn" onClick={onCopyInvite} title="Copy invite link">
+              {copiedInvite ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
+            </button>
+
+            <MoreHorizontal
+              size={16}
+              style={{ color: '#94a3b8', cursor: 'pointer' }}
+              onClick={() => setActiveTool('info')}
+            />
+          </div>
+        </header>
+
+        {/* Workspace Body: Dual Stage + Right Sidebar */}
+        <div className="workspace-body-layout">
+          {/* Main Video Stage Area */}
+          <main className="workspace-stage-area" onClick={handleStageTap}>
+            {audioPlaybackBlocked && (
+              <div className="audio-blocked-banner">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Headphones size={16} /> Browser autoplay policy blocked participant audio.
+                </div>
+                <button
+                  className="btn-primary-orange"
+                  style={{ padding: '6px 14px', fontSize: 12 }}
+                  onClick={onEnableAudio}
+                >
+                  Enable Audio
+                </button>
+              </div>
+            )}
+
+            {/* Recording Paused Floating Indicator */}
+            {recording && isRecordingPaused && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(234, 179, 8, 0.95)',
+                  color: '#0a0d16',
+                  padding: '7px 18px',
+                  borderRadius: 999,
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.6)',
+                  zIndex: 40,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  letterSpacing: 0.3,
+                }}
+              >
+                <Pause size={14} fill="#0a0d16" />
+                <span>Recording is PAUSED • Click Resume to continue</span>
+              </div>
+            )}
+
+            {/* Live Screen Share Stage View OR Dual Video Grid */}
+            {isScreenSharing ? (
+              <div className="screen-share-stage-container">
+                <video
+                  ref={screenVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="screen-share-video-elem"
+                />
+                {/* Floating participant webcams in PiP dock */}
+                <div className="screen-share-pip-dock">
+                  <div className="screen-share-pip-item local-video-container">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      style={{ filter: activeFilterCss }}
+                    />
+                    <div className="participant-label-pill" style={{ bottom: 6, left: 6, fontSize: 10, padding: '3px 8px' }}>
+                      <span>👑 {localName || 'You'}</span>
+                    </div>
+                  </div>
+                  {remotePresent && connected && (
+                    <div className="screen-share-pip-item">
+                      <video
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                      />
+                      <div className="participant-label-pill" style={{ bottom: 6, left: 6, fontSize: 10, padding: '3px 8px' }}>
+                        <span>🎙 {remoteName || 'Guest'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`video-stage-grid ${layoutMode === 'pip' ? 'layout-pip-mode' : ''} ${
+                  spotlightTile ? 'layout-spotlight-mode' : ''
+                }`}
+              >
+                {/* Local Participant (Interviewer / You) */}
+                <div
+                  ref={localContainerRef}
+                  className={`video-container local-video-container ${
+                    layoutMode === 'pip' && spotlightTile !== 'local' ? `pip-corner-${pipCorner}` : ''
+                  } ${spotlightTile === 'local' ? 'spotlight-primary' : ''}`}
+                  style={{
+                    order: isTilesSwapped ? 2 : 1,
+                  }}
+                >
+                  {/* Interactive Tile Hover Action Bar */}
+                  <div className="tile-hover-toolbar">
+                    {/* Rotate 90° */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${localRotation > 0 ? 'active' : ''}`}
+                      onClick={() => setLocalRotation(r => (r + 90) % 360)}
+                      title={`Rotate Camera (Current: ${localRotation}°)`}
+                    >
+                      <RotateCw size={13} />
+                    </button>
+                    {/* Mirror Flip */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${isLocalMirrored ? 'active' : ''}`}
+                      onClick={() => setIsLocalMirrored(m => !m)}
+                      title={isLocalMirrored ? 'Mirror Reflection (ON)' : 'Mirror Reflection (OFF)'}
+                    >
+                      <FlipHorizontal size={13} />
+                    </button>
+                    {/* Spotlight / Pin */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${spotlightTile === 'local' ? 'active' : ''}`}
+                      onClick={() => setSpotlightTile(spotlightTile === 'local' ? null : 'local')}
+                      title={spotlightTile === 'local' ? 'Unpin Local Video' : 'Spotlight / Maximize You'}
+                    >
+                      <Pin size={13} />
+                    </button>
+                    {/* Swap Positions */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${isTilesSwapped ? 'active' : ''}`}
+                      onClick={() => setIsTilesSwapped(s => !s)}
+                      title="Swap Left / Right Video Positions"
+                    >
+                      <ArrowLeftRight size={13} />
+                    </button>
+                    {/* Move PiP Corner */}
+                    {layoutMode === 'pip' && (
+                      <button
+                        type="button"
+                        className="tile-action-btn"
+                        onClick={cyclePipCorner}
+                        title={`Move PiP Corner (${pipCorner})`}
+                      >
+                        <Move size={13} />
+                      </button>
+                    )}
+                    {/* Native Fullscreen */}
+                    <button
+                      type="button"
+                      className="tile-action-btn"
+                      onClick={() => handleFullscreen(localContainerRef)}
+                      title="Fullscreen Video Tile"
+                    >
+                      <Maximize2 size={13} />
+                    </button>
+                  </div>
+
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    style={{
+                      display: cameraOn ? 'block' : 'none',
+                      filter: activeFilterCss,
+                      transform: `${(facingMode === 'environment' ? !isLocalMirrored : isLocalMirrored) ? 'scaleX(-1)' : 'scaleX(1)'} ${
+                        localRotation ? `rotate(${localRotation}deg)` : ''
+                      }`,
+                      transition: 'transform 0.25s ease',
+                    }}
+                  />
+                  {!cameraOn && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', background: '#0e1424' }}>
+                      <div style={{ width: 68, height: 68, borderRadius: '50%', background: '#ff6b00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700, color: '#fff', boxShadow: '0 0 20px rgba(255,107,0,0.4)' }}>
+                        {(localName || 'P').charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{ fontSize: 13, color: '#94a3b8', marginTop: 10, fontWeight: 500 }}>Camera Off</span>
+                    </div>
+                  )}
+                  {/* Active Filter Pill Badge */}
+                  <button
+                    type="button"
+                    className="video-filter-pill-trigger"
+                    onClick={() => setActiveTool(activeTool === 'filters' ? 'recording' : 'filters')}
+                    title="Change Ultra HD Camera Filter"
+                  >
+                    <Sparkles size={11} color="#06b6d4" />
+                    <span>{(VIDEO_FILTERS.find(f => f.id === activeFilterId) || VIDEO_FILTERS[0]).name.split(' ')[0]}</span>
+                  </button>
+
+                  <div className="participant-label-pill">
+                    <span style={{ color: '#f59e0b' }}>👑</span>
+                    <span>{localName || 'Preet Yadav'} (You)</span>
+                    <AudioWaveform active={micOn} color="#ff6b00" height={13} />
+                  </div>
+                </div>
+
+                {/* Remote Participant (Real video when connected, Clean waiting radar when alone) */}
+                <div
+                  ref={remoteContainerRef}
+                  className={`video-container remote-video ${
+                    layoutMode === 'pip' && spotlightTile === 'local' ? `pip-corner-${pipCorner}` : ''
+                  } ${spotlightTile === 'remote' ? 'spotlight-primary' : ''}`}
+                  style={{
+                    order: isTilesSwapped ? 1 : 2,
+                  }}
+                >
+                  {/* Interactive Tile Hover Action Bar */}
+                  <div className="tile-hover-toolbar">
+                    {/* Rotate 90° */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${remoteRotation > 0 ? 'active' : ''}`}
+                      onClick={() => setRemoteRotation(r => (r + 90) % 360)}
+                      title={`Rotate Guest Camera (Current: ${remoteRotation}°)`}
+                    >
+                      <RotateCw size={13} />
+                    </button>
+                    {/* Spotlight / Pin */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${spotlightTile === 'remote' ? 'active' : ''}`}
+                      onClick={() => setSpotlightTile(spotlightTile === 'remote' ? null : 'remote')}
+                      title={spotlightTile === 'remote' ? 'Unpin Guest' : 'Spotlight / Maximize Guest'}
+                    >
+                      <Pin size={13} />
+                    </button>
+                    {/* Swap Positions */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${isTilesSwapped ? 'active' : ''}`}
+                      onClick={() => setIsTilesSwapped(s => !s)}
+                      title="Swap Left / Right Video Positions"
+                    >
+                      <ArrowLeftRight size={13} />
+                    </button>
+                    {/* Move PiP Corner */}
+                    {layoutMode === 'pip' && (
+                      <button
+                        type="button"
+                        className="tile-action-btn"
+                        onClick={cyclePipCorner}
+                        title={`Move PiP Corner (${pipCorner})`}
+                      >
+                        <Move size={13} />
+                      </button>
+                    )}
+                    {/* Native Fullscreen */}
+                    <button
+                      type="button"
+                      className="tile-action-btn"
+                      onClick={() => handleFullscreen(remoteContainerRef)}
+                      title="Fullscreen Video Tile"
+                    >
+                      <Maximize2 size={13} />
+                    </button>
+                  </div>
+
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    style={{
+                      display: remotePresent && connected ? 'block' : 'none',
+                      transform: remoteRotation ? `rotate(${remoteRotation}deg)` : 'none',
+                      transition: 'transform 0.25s ease',
+                    }}
+                  />
+                  {(!remotePresent || !connected) && (
+                    <div className="waiting-participant-card">
+                      <div className="waiting-pulse-rings">
+                        <div className="pulse-ring ring-1" />
+                        <div className="pulse-ring ring-2" />
+                        <div className="waiting-radar-center">
+                          <Users size={24} color="#ff6b00" />
+                        </div>
+                      </div>
+                      <div className="waiting-title">Waiting for participants…</div>
+                      <div className="waiting-subtitle">
+                        Room is ready. Share the invite link with up to 100 participants to start.
+                      </div>
+                      <button
+                        type="button"
+                        className="waiting-copy-btn"
+                        onClick={onCopyInvite}
+                      >
+                        {copiedInvite ? (
+                          <>
+                            <Check size={14} color="#10b981" /> Link Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} /> Copy Room Link
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  {remotePresent && connected && (
+                    <div className="participant-label-pill">
+                      <span>🎙</span>
+                      <span>{remoteName || 'Guest'}</span>
+                      <AudioWaveform active={true} color="#10b981" height={13} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Dock Toolbar: Mobile Touch Dock on Mobile, Full Dock Toolbar on Desktop */}
+            {isMobile ? (
+              <div className={`mobile-floating-dock ${!showControls ? 'hidden' : ''}`}>
+                <button
+                  type="button"
+                  className={`dock-circle-btn ${!micOn ? 'muted' : ''}`}
+                  onClick={onToggleMic}
+                  title={micOn ? 'Mute Mic' : 'Unmute Mic'}
+                >
+                  {micOn ? <Mic size={20} /> : <MicOff size={20} />}
+                </button>
+
+                <button
+                  type="button"
+                  className={`dock-circle-btn ${!cameraOn ? 'muted' : ''}`}
+                  onClick={onToggleCamera}
+                  title={cameraOn ? 'Turn Camera Off' : 'Turn Camera On'}
+                >
+                  {cameraOn ? <Video size={20} /> : <VideoOff size={20} />}
+                </button>
+
+                <button
+                  type="button"
+                  className="dock-circle-btn flip-cam-btn"
+                  onClick={onFlipCamera}
+                  title={`Flip Camera (${facingMode === 'user' ? 'Front' : 'Back'})`}
+                  style={{
+                    background: facingMode === 'environment' ? 'rgba(56, 189, 248, 0.2)' : undefined,
+                    borderColor: facingMode === 'environment' ? '#38bdf8' : undefined,
+                  }}
+                >
+                  <SwitchCamera size={20} color={facingMode === 'environment' ? '#38bdf8' : '#ffffff'} />
+                </button>
+
+                <button
+                  type="button"
+                  className={`dock-circle-btn ${mobileDrawerOpen && activeTool === 'chat' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTool('chat')
+                    setMobileDrawerOpen(true)
+                  }}
+                  title="Open In-Meeting Chat"
+                  style={{ position: 'relative' }}
+                >
+                  <MessageSquare size={20} />
+                  {chatMessages.length > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: -3,
+                        right: -3,
+                        background: '#ff6b00',
+                        color: '#fff',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '1px 5px',
+                        minWidth: 16,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {chatMessages.length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className={`dock-circle-btn ${mobileDrawerOpen && activeTool !== 'chat' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (!mobileDrawerOpen) setActiveTool('participants')
+                    setMobileDrawerOpen(!mobileDrawerOpen)
+                  }}
+                  title="More Options"
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+
+                <button
+                  type="button"
+                  className="dock-leave-btn mobile-leave-btn"
+                  onClick={onLeaveMeeting}
+                  title="Leave Meeting"
+                >
+                  <PhoneOff size={18} />
+                </button>
+              </div>
+            ) : (
+            <div className="floating-dock-toolbar">
+              <div className="dock-actions-group">
+                {/* Mic */}
+                <div className="dock-item-labeled">
+                  <button
+                    className={`dock-circle-btn ${!micOn ? 'muted' : ''}`}
+                    onClick={onToggleMic}
+                    title={micOn ? 'Mute Mic' : 'Unmute Mic'}
+                  >
+                    {micOn ? <Mic size={19} /> : <MicOff size={19} />}
+                  </button>
+                  <span>{micOn ? 'Mic' : 'Muted'}</span>
+                </div>
+
+                {/* Camera */}
+                <div className="dock-item-labeled">
+                  <button
+                    className={`dock-circle-btn ${!cameraOn ? 'muted' : ''}`}
+                    onClick={onToggleCamera}
+                    title={cameraOn ? 'Turn Camera Off' : 'Turn Camera On'}
+                  >
+                    {cameraOn ? <Video size={19} /> : <VideoOff size={19} />}
+                  </button>
+                  <span>{cameraOn ? 'Camera' : 'Off'}</span>
+                </div>
+
+                {/* Ultra HD Filters Dock Button */}
+                <div className="dock-item-labeled">
+                  <button
+                    className={`dock-circle-btn ${activeTool === 'filters' ? 'active' : ''}`}
+                    onClick={() => setActiveTool(activeTool === 'filters' ? 'recording' : 'filters')}
+                    title="Camera Ultra HD Filters"
+                    style={{ borderColor: activeTool === 'filters' ? '#06b6d4' : undefined }}
+                  >
+                    <Sparkles size={18} style={{ color: '#06b6d4' }} />
+                  </button>
+                  <span>Filters</span>
+                </div>
+
+                {/* Live Screen Share Toggle */}
+                <div className="dock-item-labeled">
+                  <button
+                    className={`dock-circle-btn ${isScreenSharing ? 'sharing-screen' : ''}`}
+                    onClick={() => {
+                      if (isScreenSharing) {
+                        onToggleScreenShare?.()
+                      } else if (isHost || screenShareAllowedForAll) {
+                        onToggleScreenShare?.()
+                      } else {
+                        alert(
+                          'Screen sharing is currently restricted by the host. Please ask the meeting host to enable participant screen sharing in Host Controls.'
+                        )
+                      }
+                    }}
+                    title={
+                      isScreenSharing
+                        ? 'Stop Screen Share'
+                        : isHost || screenShareAllowedForAll
+                        ? 'Share Your Screen (HD + Audio)'
+                        : 'Screen sharing restricted by host'
+                    }
+                  >
+                    {isScreenSharing ? <MonitorOff size={19} color="#ef4444" /> : <MonitorUp size={19} />}
+                  </button>
+                  <span style={{ color: isScreenSharing ? '#ef4444' : undefined, fontWeight: isScreenSharing ? 600 : undefined }}>
+                    {isScreenSharing ? 'Stop Share' : 'Share Screen'}
+                  </span>
+                </div>
+
+                {/* Prominent Recording Control Button */}
+                <div className="dock-item-labeled">
+                  {recording ? (
+                    <button
+                      className="dock-rec-stop-btn"
+                      onClick={onStopRecording}
+                      title="Stop Recording"
+                    >
+                      <span className="dock-rec-stop-square" />
+                    </button>
+                  ) : (
+                    <button
+                      className="dock-rec-start-btn"
+                      onClick={onOpenRecordingModal}
+                      title="Start Recording"
+                    >
+                      <Radio size={20} />
+                    </button>
+                  )}
+                  <span>{recording ? 'Stop Recording' : 'Record'}</span>
+                </div>
+
+                {/* Pause / Resume Recording Control Button */}
+                {recording && (
+                  <div className="dock-item-labeled">
+                    <button
+                      type="button"
+                      className={`dock-circle-btn ${isRecordingPaused ? 'recording-paused-btn' : ''}`}
+                      onClick={onTogglePauseRecording}
+                      title={isRecordingPaused ? 'Resume Recording' : 'Pause Recording'}
+                      style={{
+                        borderColor: isRecordingPaused ? '#eab308' : '#94a3b8',
+                        color: isRecordingPaused ? '#eab308' : '#ffffff',
+                        background: isRecordingPaused ? 'rgba(234, 179, 8, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+                      }}
+                    >
+                      {isRecordingPaused ? <Play size={18} fill="#eab308" /> : <Pause size={18} fill="#ffffff" />}
+                    </button>
+                    <span style={{ color: isRecordingPaused ? '#eab308' : undefined, fontWeight: isRecordingPaused ? 600 : undefined }}>
+                      {isRecordingPaused ? 'Resume' : 'Pause'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Raise Hand */}
+                <div className="dock-item-labeled">
+                  <button
+                    className={`dock-circle-btn ${handRaised ? 'active' : ''}`}
+                    onClick={() => setHandRaised(!handRaised)}
+                    title="Raise Hand"
+                  >
+                    <Hand size={19} style={{ color: handRaised ? '#ff6b00' : 'inherit' }} />
+                  </button>
+                  <span>Raise Hand</span>
+                </div>
+
+                {/* Interactive Emoji Reactions */}
+                <div className="dock-item-labeled" style={{ position: 'relative' }}>
+                  <button
+                    className="dock-circle-btn"
+                    onClick={() => setShowReactionPicker(!showReactionPicker)}
+                    title="Send Reaction"
+                  >
+                    <Smile size={19} />
+                  </button>
+                  <span>React</span>
+
+                  {showReactionPicker && (
+                    <div className="reaction-picker-popover">
+                      {['👏', '❤️', '🔥', '🚀', '👍', '😂'].map(emoji => (
+                        <button
+                          key={emoji}
+                          className="reaction-emoji-btn"
+                          onClick={() => triggerReaction(emoji)}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* More / Settings */}
+                <div className="dock-item-labeled">
+                  <button
+                    className="dock-circle-btn"
+                    onClick={() => setActiveTool('info')}
+                    title="More Options"
+                  >
+                    <MoreHorizontal size={19} />
+                  </button>
+                  <span>More</span>
+                </div>
+              </div>
+
+              {/* Leave Button */}
+              <button className="dock-leave-btn" onClick={onLeaveMeeting}>
+                <PhoneOff size={15} /> Leave
+              </button>
+            </div>
+            )}
+          </main>
+
+          {/* Right Sidebar: Meeting Tools on Desktop */}
+          {!isMobile && (
+            <aside className="workspace-tools-sidebar">
+              <h3 className="sidebar-tools-title">Meeting Tools</h3>
+
+            <div className="sidebar-tools-list">
+              <button
+                className={`sidebar-tool-item ${activeTool === 'recording' ? 'active' : ''}`}
+                onClick={() => setActiveTool('recording')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="sidebar-rec-dot" /> <span>Recording</span>
+                </div>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'filters' ? 'active' : ''}`}
+                onClick={() => setActiveTool('filters')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Sparkles size={16} color="#06b6d4" /> <span>Camera Filters</span>
+                </div>
+                <span className="sidebar-unread-pill" style={{ background: '#06b6d4' }}>HD</span>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'chat' ? 'active' : ''}`}
+                onClick={() => setActiveTool('chat')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <MessageSquare size={16} /> <span>Chat</span>
+                </div>
+                <span className="sidebar-unread-pill">1</span>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'notes' ? 'active' : ''}`}
+                onClick={() => setActiveTool('notes')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <FileText size={16} /> <span>Interview Notes</span>
+                </div>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'mixer' ? 'active' : ''}`}
+                onClick={() => setActiveTool('mixer')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Sliders size={16} /> <span>Audio Mixer</span>
+                </div>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'participants' ? 'active' : ''}`}
+                onClick={() => setActiveTool('participants')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Users size={16} /> <span>Participants ({participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)})</span>
+                </div>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'screen' ? 'active' : ''}`}
+                onClick={() => setActiveTool('screen')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <MonitorUp size={16} /> <span>Screen Share</span>
+                </div>
+              </button>
+
+              <button
+                className={`sidebar-tool-item ${activeTool === 'info' ? 'active' : ''}`}
+                onClick={() => setActiveTool('info')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Info size={16} /> <span>Meeting Info</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Sidebar Active Panel Content */}
+              {/* Sidebar Active Panel Content */}
+              <div className="sidebar-tool-content-box">
+                {renderToolContent()}
+              </div>
+            </aside>
+          )}
+
+          {/* Slide-Up Bottom Sheet Drawer on Mobile (Google Meet / Zoom style) */}
+          {isMobile && mobileDrawerOpen && (
+            <>
+              <div className="mobile-drawer-backdrop" onClick={() => setMobileDrawerOpen(false)} />
+              <div className="mobile-bottom-sheet">
+                <div className="drawer-handle-bar" onClick={() => setMobileDrawerOpen(false)}>
+                  <div className="drawer-handle-pill" />
+                </div>
+
+                <div className="drawer-header-row">
+                  <div className="drawer-nav-scroll">
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'chat' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('chat')}
+                    >
+                      <MessageSquare size={13} /> Chat
+                      {chatMessages.length > 0 && <span className="drawer-badge">{chatMessages.length}</span>}
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'participants' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('participants')}
+                    >
+                      <Users size={13} /> People ({participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)})
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'filters' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('filters')}
+                    >
+                      <Sparkles size={13} /> Filters
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'recording' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('recording')}
+                    >
+                      <Radio size={13} /> Rec
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'screen' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('screen')}
+                    >
+                      <MonitorUp size={13} /> Screen
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'notes' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('notes')}
+                    >
+                      <FileText size={13} /> Notes
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'mixer' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('mixer')}
+                    >
+                      <Sliders size={13} /> Mixer
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer-tab-pill ${activeTool === 'info' ? 'active' : ''}`}
+                      onClick={() => setActiveTool('info')}
+                    >
+                      <Info size={13} /> Info
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="drawer-close-btn"
+                    onClick={() => setMobileDrawerOpen(false)}
+                    aria-label="Close Drawer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="drawer-panel-body">
+                  {renderToolContent()}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
