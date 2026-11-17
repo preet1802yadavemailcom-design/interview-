@@ -1,3 +1,5 @@
+import fixWebmDuration from 'fix-webm-duration'
+
 export interface RecorderResult {
   blob: Blob
   filename: string
@@ -331,22 +333,33 @@ export class InterviewRecorder {
         reject(new Error('The browser reported an error during recording. Try a shorter interview or close other heavy tabs.'))
       }
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const mimeType = recorder.mimeType || 'video/mp4'
         const isMp4 = mimeType.includes('mp4')
         const extension = isMp4 ? 'mp4' : 'webm'
-        const blob = new Blob(this.chunks, { type: mimeType })
-        const durationMs = Date.now() - this.startedAt
+        const rawBlob = new Blob(this.chunks, { type: mimeType })
+        const durationMs = Math.max(1000, Date.now() - this.startedAt)
+        let finalBlob = rawBlob
+
+        // Fix missing EBML duration metadata in WebM files recorded from Chrome/Edge
+        if (!isMp4 && durationMs > 0 && typeof fixWebmDuration === 'function') {
+          try {
+            finalBlob = await fixWebmDuration(rawBlob, durationMs)
+          } catch (err) {
+            console.warn('[Recorder] fixWebmDuration warning (using rawBlob):', err)
+          }
+        }
+
         const hasScreen = this.screenWasSelected
         const hasScreenAudio = this.screenHasAudio
-        const sizeBytes = blob.size
+        const sizeBytes = finalBlob.size
 
         const dateStamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
         const filename = `InterviewCapture_${dateStamp}.${extension}`
 
         this.cleanup()
         resolve({
-          blob,
+          blob: finalBlob,
           filename,
           durationMs,
           hasScreen,

@@ -2444,12 +2444,160 @@ input:checked + .slider:before {
 
 .video-stage-grid.layout-pip-mode .local-video-container {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
   width: 28%;
+  max-width: 340px;
   z-index: 10;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 0 2px var(--primary-orange);
   border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.video-stage-grid.layout-pip-mode .pip-corner-bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+.video-stage-grid.layout-pip-mode .pip-corner-bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+.video-stage-grid.layout-pip-mode .pip-corner-top-right {
+  top: 20px;
+  right: 20px;
+}
+.video-stage-grid.layout-pip-mode .pip-corner-top-left {
+  top: 20px;
+  left: 20px;
+}
+
+/* ==============================================================================
+   SPOTLIGHT & SPEAKER VIEW MODE
+   ============================================================================== */
+.video-stage-grid.layout-spotlight-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+}
+
+.video-stage-grid.layout-spotlight-mode .spotlight-primary {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+.video-stage-grid.layout-spotlight-mode .spotlight-filmstrip {
+  height: 140px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.video-stage-grid.layout-spotlight-mode .spotlight-filmstrip .video-container {
+  width: 230px;
+  height: 100%;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 9;
+}
+
+/* ==============================================================================
+   TILE HOVER ACTION TOOLBAR (Pin, Maximize, Rotate, Mirror, Corner Swap)
+   ============================================================================== */
+.tile-hover-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(8, 12, 22, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 20;
+}
+
+.video-container:hover .tile-hover-toolbar {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tile-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.tile-action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.tile-action-btn.active {
+  background: rgba(255, 107, 0, 0.25);
+  color: #ff6b00;
+}
+
+/* ==============================================================================
+   THEATER / IMMERSION MODE (Collapses header/sidebars for 100% full-screen video)
+   ============================================================================== */
+.workspace-main-frame.theater-mode-active .workspace-top-bar {
+  display: none !important;
+}
+
+.workspace-main-frame.theater-mode-active .workspace-tools-sidebar {
+  display: none !important;
+}
+
+.workspace-main-frame.theater-mode-active .workspace-body-layout {
+  height: calc(100vh - 20px);
+}
+
+.theater-exit-pill {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(8, 12, 22, 0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.2s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.theater-exit-pill:hover {
+  background: #ff6b00;
+  color: #ffffff;
+  border-color: #ff6b00;
+  box-shadow: 0 0 16px rgba(255, 107, 0, 0.5);
+}
+
+/* Active Speaker Border Glow */
+.video-container.active-speaker {
+  box-shadow: 0 0 0 2px #ff6b00, 0 0 20px rgba(255, 107, 0, 0.35);
 }
 
 /* In-call Notes Textarea */

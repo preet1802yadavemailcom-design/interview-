@@ -11,12 +11,15 @@ export type SignalKind =
   | 'recording-consent'
   | 'recording-decline'
   | 'recording-purpose'
+  | 'allow-screen-share'
+  | 'mute-all'
+  | 'room-lock'
 
 export interface SignalMessage {
   from: string
   to?: string
   kind: SignalKind
-  data?: RTCSessionDescriptionInit | RTCIceCandidateInit
+  data?: RTCSessionDescriptionInit | RTCIceCandidateInit | boolean | string | Record<string, unknown>
   purpose?: string
 }
 

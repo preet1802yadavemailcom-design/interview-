@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
   Video,
   Mic,
@@ -24,8 +24,18 @@ import {
   Download,
   LayoutGrid,
   Maximize2,
+  Minimize2,
   Volume2,
   Sparkles,
+  RotateCw,
+  FlipHorizontal,
+  Pin,
+  ArrowLeftRight,
+  Move,
+  Shield,
+  Lock,
+  Search,
+  Tv,
 } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 import AudioWaveform from './AudioWaveform'
@@ -51,6 +61,11 @@ interface LiveWorkspaceProps {
   screenVideoRef?: React.RefObject<HTMLVideoElement | null>
   isScreenSharing?: boolean
   onToggleScreenShare?: () => void
+  screenShareAllowedForAll?: boolean
+  onToggleAllowScreenShare?: (allowed: boolean) => void
+  onHostMuteAll?: () => void
+  isRoomLocked?: boolean
+  onToggleLockRoom?: (locked: boolean) => void
   participants?: RoomMember[]
   onToggleMic: () => void
   onToggleCamera: () => void
@@ -92,6 +107,11 @@ export default function LiveWorkspace({
   screenVideoRef,
   isScreenSharing = false,
   onToggleScreenShare,
+  screenShareAllowedForAll = true,
+  onToggleAllowScreenShare,
+  onHostMuteAll,
+  isRoomLocked = false,
+  onToggleLockRoom,
   participants = [],
   onToggleMic,
   onToggleCamera,
@@ -123,6 +143,51 @@ export default function LiveWorkspace({
   const [layoutMode, setLayoutMode] = useState<'grid' | 'pip'>('grid')
   const [hostVolume, setHostVolume] = useState(100)
   const [guestVolume, setGuestVolume] = useState(100)
+
+  // Interactive Tile Transformations State
+  const [localRotation, setLocalRotation] = useState<number>(0)
+  const [remoteRotation, setRemoteRotation] = useState<number>(0)
+  const [isLocalMirrored, setIsLocalMirrored] = useState<boolean>(true)
+  const [isTilesSwapped, setIsTilesSwapped] = useState<boolean>(false)
+  const [spotlightTile, setSpotlightTile] = useState<'local' | 'remote' | null>(null)
+  const [pipCorner, setPipCorner] = useState<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'>('bottom-right')
+  const [isTheaterMode, setIsTheaterMode] = useState<boolean>(false)
+  const [showLayoutMenu, setShowLayoutMenu] = useState<boolean>(false)
+  const [participantSearch, setParticipantSearch] = useState<string>('')
+
+  const localContainerRef = useRef<HTMLDivElement | null>(null)
+  const remoteContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Cycle PiP Corner across all 4 positions
+  const cyclePipCorner = () => {
+    setPipCorner(curr => {
+      if (curr === 'bottom-right') return 'bottom-left'
+      if (curr === 'bottom-left') return 'top-left'
+      if (curr === 'top-left') return 'top-right'
+      return 'bottom-right'
+    })
+  }
+
+  // Native Fullscreen Toggle for Video Tile
+  const handleFullscreen = (ref: React.RefObject<HTMLDivElement | null>) => {
+    if (!ref.current) return
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined)
+    } else {
+      void ref.current.requestFullscreen().catch(() => undefined)
+    }
+  }
+
+  // Keyboard shortcut: Esc exits Theater Mode
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isTheaterMode) {
+        setIsTheaterMode(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isTheaterMode])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -178,7 +243,20 @@ export default function LiveWorkspace({
       </div>
 
       {/* Main Workspace Frame */}
-      <div className="workspace-main-frame">
+      <div className={`workspace-main-frame ${isTheaterMode ? 'theater-mode-active' : ''}`}>
+        {/* Floating Theater Mode Exit Button */}
+        {isTheaterMode && (
+          <button
+            type="button"
+            className="theater-exit-pill"
+            onClick={() => setIsTheaterMode(false)}
+            title="Exit Theater Immersion Mode (or press Esc)"
+          >
+            <Minimize2 size={14} />
+            <span>Exit Theater Mode (Esc)</span>
+          </button>
+        )}
+
         {/* Workspace Top Header Bar */}
         <header className="workspace-top-bar">
           <div className="workspace-top-left">
@@ -214,15 +292,131 @@ export default function LiveWorkspace({
           </div>
 
           <div className="workspace-top-right">
-            {/* Layout Mode Switcher */}
-            <button
-              className="layout-mode-btn"
-              onClick={() => setLayoutMode(layoutMode === 'grid' ? 'pip' : 'grid')}
-              title={`Switch to ${layoutMode === 'grid' ? 'Picture-in-Picture' : 'Side-by-Side'} layout`}
-            >
-              {layoutMode === 'grid' ? <Maximize2 size={14} /> : <LayoutGrid size={14} />}
-              <span>{layoutMode === 'grid' ? 'Grid View' : 'PiP View'}</span>
-            </button>
+            {/* Layout Mode Dropdown Menu */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className="layout-mode-btn"
+                onClick={() => setShowLayoutMenu(prev => !prev)}
+                title="Switch Layout Mode (Grid, Spotlight, PiP, Theater)"
+              >
+                {spotlightTile ? <Pin size={14} color="#ff6b00" /> : layoutMode === 'pip' ? <Maximize2 size={14} /> : <LayoutGrid size={14} />}
+                <span>
+                  {spotlightTile ? 'Spotlight' : layoutMode === 'pip' ? 'PiP Mode' : 'Grid View'}
+                </span>
+              </button>
+
+              {showLayoutMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    background: '#0d1322',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: 12,
+                    boxShadow: '0 12px 36px rgba(0,0,0,0.7)',
+                    padding: '6px',
+                    zIndex: 100,
+                    minWidth: 185,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                >
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: layoutMode === 'grid' && !spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: layoutMode === 'grid' && !spotlightTile ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setLayoutMode('grid')
+                      setSpotlightTile(null)
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <LayoutGrid size={14} /> Side-by-Side Grid
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: layoutMode === 'pip' && !spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: layoutMode === 'pip' && !spotlightTile ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setLayoutMode('pip')
+                      setSpotlightTile(null)
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <Maximize2 size={14} /> Picture-in-Picture
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: spotlightTile ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: spotlightTile ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setSpotlightTile(spotlightTile ? null : 'remote')
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <Pin size={14} /> Spotlight Speaker
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      background: isTheaterMode ? 'rgba(255,107,0,0.18)' : 'transparent',
+                      color: isTheaterMode ? '#ff6b00' : '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      textAlign: 'left',
+                    }}
+                    onClick={() => {
+                      setIsTheaterMode(true)
+                      setShowLayoutMenu(false)
+                    }}
+                  >
+                    <Tv size={14} /> Theater Immersion
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="pill-stat" title="Up to 100 participants supported in this room">
               <Users size={14} /> <span>{participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)} / 100</span>
@@ -305,9 +499,81 @@ export default function LiveWorkspace({
                 </div>
               </div>
             ) : (
-              <div className={`video-stage-grid ${layoutMode === 'pip' ? 'layout-pip-mode' : ''}`}>
-                {/* Left Participant (Interviewer / Preet Yadav) */}
-                <div className="video-container local-video-container">
+              <div
+                className={`video-stage-grid ${layoutMode === 'pip' ? 'layout-pip-mode' : ''} ${
+                  spotlightTile ? 'layout-spotlight-mode' : ''
+                }`}
+              >
+                {/* Local Participant (Interviewer / You) */}
+                <div
+                  ref={localContainerRef}
+                  className={`video-container local-video-container ${
+                    layoutMode === 'pip' && spotlightTile !== 'local' ? `pip-corner-${pipCorner}` : ''
+                  } ${spotlightTile === 'local' ? 'spotlight-primary' : ''}`}
+                  style={{
+                    order: isTilesSwapped ? 2 : 1,
+                  }}
+                >
+                  {/* Interactive Tile Hover Action Bar */}
+                  <div className="tile-hover-toolbar">
+                    {/* Rotate 90° */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${localRotation > 0 ? 'active' : ''}`}
+                      onClick={() => setLocalRotation(r => (r + 90) % 360)}
+                      title={`Rotate Camera (Current: ${localRotation}°)`}
+                    >
+                      <RotateCw size={13} />
+                    </button>
+                    {/* Mirror Flip */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${isLocalMirrored ? 'active' : ''}`}
+                      onClick={() => setIsLocalMirrored(m => !m)}
+                      title={isLocalMirrored ? 'Mirror Reflection (ON)' : 'Mirror Reflection (OFF)'}
+                    >
+                      <FlipHorizontal size={13} />
+                    </button>
+                    {/* Spotlight / Pin */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${spotlightTile === 'local' ? 'active' : ''}`}
+                      onClick={() => setSpotlightTile(spotlightTile === 'local' ? null : 'local')}
+                      title={spotlightTile === 'local' ? 'Unpin Local Video' : 'Spotlight / Maximize You'}
+                    >
+                      <Pin size={13} />
+                    </button>
+                    {/* Swap Positions */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${isTilesSwapped ? 'active' : ''}`}
+                      onClick={() => setIsTilesSwapped(s => !s)}
+                      title="Swap Left / Right Video Positions"
+                    >
+                      <ArrowLeftRight size={13} />
+                    </button>
+                    {/* Move PiP Corner */}
+                    {layoutMode === 'pip' && (
+                      <button
+                        type="button"
+                        className="tile-action-btn"
+                        onClick={cyclePipCorner}
+                        title={`Move PiP Corner (${pipCorner})`}
+                      >
+                        <Move size={13} />
+                      </button>
+                    )}
+                    {/* Native Fullscreen */}
+                    <button
+                      type="button"
+                      className="tile-action-btn"
+                      onClick={() => handleFullscreen(localContainerRef)}
+                      title="Fullscreen Video Tile"
+                    >
+                      <Maximize2 size={13} />
+                    </button>
+                  </div>
+
                   <video
                     ref={localVideoRef}
                     autoPlay
@@ -316,6 +582,10 @@ export default function LiveWorkspace({
                     style={{
                       display: cameraOn ? 'block' : 'none',
                       filter: activeFilterCss,
+                      transform: `${isLocalMirrored ? 'scaleX(-1)' : 'scaleX(1)'} ${
+                        localRotation ? `rotate(${localRotation}deg)` : ''
+                      }`,
+                      transition: 'transform 0.25s ease',
                     }}
                   />
                   {!cameraOn && (
@@ -344,13 +614,76 @@ export default function LiveWorkspace({
                   </div>
                 </div>
 
-                {/* Right Participant (Real video when connected, Clean waiting radar when alone) */}
-                <div className="video-container remote-video">
+                {/* Remote Participant (Real video when connected, Clean waiting radar when alone) */}
+                <div
+                  ref={remoteContainerRef}
+                  className={`video-container remote-video ${
+                    layoutMode === 'pip' && spotlightTile === 'local' ? `pip-corner-${pipCorner}` : ''
+                  } ${spotlightTile === 'remote' ? 'spotlight-primary' : ''}`}
+                  style={{
+                    order: isTilesSwapped ? 1 : 2,
+                  }}
+                >
+                  {/* Interactive Tile Hover Action Bar */}
+                  <div className="tile-hover-toolbar">
+                    {/* Rotate 90° */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${remoteRotation > 0 ? 'active' : ''}`}
+                      onClick={() => setRemoteRotation(r => (r + 90) % 360)}
+                      title={`Rotate Guest Camera (Current: ${remoteRotation}°)`}
+                    >
+                      <RotateCw size={13} />
+                    </button>
+                    {/* Spotlight / Pin */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${spotlightTile === 'remote' ? 'active' : ''}`}
+                      onClick={() => setSpotlightTile(spotlightTile === 'remote' ? null : 'remote')}
+                      title={spotlightTile === 'remote' ? 'Unpin Guest' : 'Spotlight / Maximize Guest'}
+                    >
+                      <Pin size={13} />
+                    </button>
+                    {/* Swap Positions */}
+                    <button
+                      type="button"
+                      className={`tile-action-btn ${isTilesSwapped ? 'active' : ''}`}
+                      onClick={() => setIsTilesSwapped(s => !s)}
+                      title="Swap Left / Right Video Positions"
+                    >
+                      <ArrowLeftRight size={13} />
+                    </button>
+                    {/* Move PiP Corner */}
+                    {layoutMode === 'pip' && (
+                      <button
+                        type="button"
+                        className="tile-action-btn"
+                        onClick={cyclePipCorner}
+                        title={`Move PiP Corner (${pipCorner})`}
+                      >
+                        <Move size={13} />
+                      </button>
+                    )}
+                    {/* Native Fullscreen */}
+                    <button
+                      type="button"
+                      className="tile-action-btn"
+                      onClick={() => handleFullscreen(remoteContainerRef)}
+                      title="Fullscreen Video Tile"
+                    >
+                      <Maximize2 size={13} />
+                    </button>
+                  </div>
+
                   <video
                     ref={remoteVideoRef}
                     autoPlay
                     playsInline
-                    style={{ display: remotePresent && connected ? 'block' : 'none' }}
+                    style={{
+                      display: remotePresent && connected ? 'block' : 'none',
+                      transform: remoteRotation ? `rotate(${remoteRotation}deg)` : 'none',
+                      transition: 'transform 0.25s ease',
+                    }}
                   />
                   {(!remotePresent || !connected) && (
                     <div className="waiting-participant-card">
@@ -438,13 +771,23 @@ export default function LiveWorkspace({
                   <button
                     className={`dock-circle-btn ${isScreenSharing ? 'sharing-screen' : ''}`}
                     onClick={() => {
-                      if (onToggleScreenShare) {
-                        onToggleScreenShare()
+                      if (isScreenSharing) {
+                        onToggleScreenShare?.()
+                      } else if (isHost || screenShareAllowedForAll) {
+                        onToggleScreenShare?.()
                       } else {
-                        setActiveTool('screen')
+                        alert(
+                          'Screen sharing is currently restricted by the host. Please ask the meeting host to enable participant screen sharing in Host Controls.'
+                        )
                       }
                     }}
-                    title={isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+                    title={
+                      isScreenSharing
+                        ? 'Stop Screen Share'
+                        : isHost || screenShareAllowedForAll
+                        ? 'Share Your Screen (HD + Audio)'
+                        : 'Screen sharing restricted by host'
+                    }
                   >
                     {isScreenSharing ? <MonitorOff size={19} color="#ef4444" /> : <MonitorUp size={19} />}
                   </button>
@@ -749,17 +1092,135 @@ export default function LiveWorkspace({
 
               {activeTool === 'participants' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Host Controls Panel (Google Meet / Zoom style moderation) */}
+                  {isHost && (
+                    <div
+                      style={{
+                        padding: '12px',
+                        background: 'rgba(255,107,0,0.06)',
+                        border: '1px solid rgba(255,107,0,0.22)',
+                        borderRadius: 10,
+                        marginBottom: 4,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: '#ff6b00' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <Shield size={14} /> Host Moderation Suite
+                        </span>
+                        <span style={{ fontSize: 10, background: 'rgba(255,107,0,0.2)', padding: '2px 6px', borderRadius: 4 }}>
+                          HOST ONLY
+                        </span>
+                      </div>
+
+                      {/* Screen Sharing Toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#e2e8f0' }}>
+                        <span>Participant Screen Share</span>
+                        <button
+                          type="button"
+                          style={{
+                            background: screenShareAllowedForAll ? '#10b981' : '#475569',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 999,
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => onToggleAllowScreenShare?.(!screenShareAllowedForAll)}
+                        >
+                          {screenShareAllowedForAll ? 'Allowed' : 'Blocked'}
+                        </button>
+                      </div>
+
+                      {/* Mute All Button */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#e2e8f0' }}>
+                        <span>Mute All Participants</span>
+                        <button
+                          type="button"
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.2)',
+                            color: '#f87171',
+                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                            borderRadius: 6,
+                            padding: '3px 8px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                          onClick={onHostMuteAll}
+                        >
+                          <MicOff size={11} /> Mute All
+                        </button>
+                      </div>
+
+                      {/* Lock Room Toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: '#e2e8f0' }}>
+                        <span>Lock Meeting Room</span>
+                        <button
+                          type="button"
+                          style={{
+                            background: isRoomLocked ? '#ef4444' : '#475569',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 999,
+                            padding: '3px 10px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => onToggleLockRoom?.(!isRoomLocked)}
+                        >
+                          {isRoomLocked ? 'Locked' : 'Open'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Header with Search for up to 100 participants */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#94a3b8', marginBottom: 2 }}>
                     <span>Joined ({participants && participants.length > 0 ? participants.length : (remotePresent ? 2 : 1)} / 100)</span>
                     <span style={{ color: '#10b981', fontWeight: 600 }}>Active</span>
                   </div>
+
+                  {/* Participant Search */}
+                  <div style={{ position: 'relative', marginBottom: 4 }}>
+                    <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                    <input
+                      type="text"
+                      placeholder="Search participants…"
+                      value={participantSearch}
+                      onChange={e => setParticipantSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 6,
+                        padding: '6px 10px 6px 30px',
+                        fontSize: 12,
+                        color: '#fff',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {/* Self Participant Card */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,107,0,0.08)', border: '1px solid rgba(255,107,0,0.2)' }}>
                     <span>👑 {localName || 'You'} ({isHost ? 'Host' : 'You'})</span>
                     <AudioWaveform active={micOn} color="#ff6b00" height={12} />
                   </div>
+
+                  {/* Other Participants List */}
                   {participants && participants.length > 0 ? (
                     participants
                       .filter(p => p.displayName !== localName)
+                      .filter(p => !participantSearch || p.displayName.toLowerCase().includes(participantSearch.toLowerCase()))
                       .map((p, idx) => (
                         <div key={p.userId || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                           <span>{p.role === 'host' ? '👑' : '🎙'} {p.displayName}</span>

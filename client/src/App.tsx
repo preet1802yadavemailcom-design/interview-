@@ -71,6 +71,8 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [screenShareAllowedForAll, setScreenShareAllowedForAll] = useState(true)
+  const [isRoomLocked, setIsRoomLocked] = useState(false)
   const [participants, setParticipants] = useState<RoomMember[]>([])
   const screenVideoRef = useRef<HTMLVideoElement | null>(null)
 
@@ -316,6 +318,26 @@ export default function App() {
 
       if (message.kind === 'recording-stop') {
         setRecording(false)
+        return
+      }
+
+      if ((message.kind as string) === 'allow-screen-share') {
+        setScreenShareAllowedForAll(Boolean(message.data))
+        return
+      }
+
+      if ((message.kind as string) === 'mute-all' && roleRef.current !== 'host') {
+        const track = localStreamRef.current?.getAudioTracks()[0]
+        if (track) {
+          track.enabled = false
+        }
+        setMicOn(false)
+        alert('The meeting host has muted all microphones.')
+        return
+      }
+
+      if ((message.kind as string) === 'room-lock') {
+        setIsRoomLocked(Boolean(message.data))
         return
       }
 
@@ -703,6 +725,38 @@ export default function App() {
     }
   }
 
+  const handleToggleAllowScreenShare = async (allowed: boolean) => {
+    setScreenShareAllowedForAll(allowed)
+    if (channelRef.current && roleRef.current === 'host') {
+      await sendSignal(channelRef.current, {
+        from: userIdRef.current,
+        kind: 'allow-screen-share',
+        data: allowed,
+      }).catch(() => undefined)
+    }
+  }
+
+  const handleHostMuteAll = async () => {
+    if (channelRef.current && roleRef.current === 'host') {
+      await sendSignal(channelRef.current, {
+        from: userIdRef.current,
+        kind: 'mute-all',
+      }).catch(() => undefined)
+      alert('Mute signal sent to all meeting participants.')
+    }
+  }
+
+  const handleToggleLockRoom = async (locked: boolean) => {
+    setIsRoomLocked(locked)
+    if (channelRef.current && roleRef.current === 'host') {
+      await sendSignal(channelRef.current, {
+        from: userIdRef.current,
+        kind: 'room-lock',
+        data: locked,
+      }).catch(() => undefined)
+    }
+  }
+
   const handleCopyInvite = async () => {
     const link = `${window.location.origin}${window.location.pathname}?room=${roomCode}`
     try {
@@ -770,6 +824,11 @@ export default function App() {
           screenVideoRef={screenVideoRef}
           isScreenSharing={isScreenSharing}
           onToggleScreenShare={handleToggleScreenShare}
+          screenShareAllowedForAll={screenShareAllowedForAll}
+          onToggleAllowScreenShare={handleToggleAllowScreenShare}
+          onHostMuteAll={handleHostMuteAll}
+          isRoomLocked={isRoomLocked}
+          onToggleLockRoom={handleToggleLockRoom}
           participants={participants}
           onToggleMic={() => {
             const track = localStreamRef.current?.getAudioTracks()[0]

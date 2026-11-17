@@ -1,5 +1,20 @@
 import React, { useState, useRef } from 'react'
-import { Calendar, Clock, HardDrive, Film, Trash2, Download, X, Play, Pause, Volume2, FastForward } from 'lucide-react'
+import {
+  Calendar,
+  Clock,
+  HardDrive,
+  Film,
+  Trash2,
+  Download,
+  X,
+  Play,
+  Pause,
+  Volume2,
+  FastForward,
+  ExternalLink,
+  Info,
+  CheckCircle2,
+} from 'lucide-react'
 import type { RecorderResult } from '../lib/recorder'
 
 interface RecordingPreviewModalProps {
@@ -42,6 +57,8 @@ export default function RecordingPreviewModal({
 
   const sizeMb = result ? (result.sizeBytes / (1024 * 1024)).toFixed(1) : '142.6'
   const durationStr = result ? formatDuration(result.durationMs) : '12:34'
+  const isMp4 = result ? (result.mimeType.includes('mp4') || result.filename.endsWith('.mp4')) : false
+  const formatLabel = isMp4 ? 'MP4 (Universal)' : 'WebM (HD VP9 • Duration Fixed)'
 
   const handleSpeedChange = (speed: number) => {
     setPlaybackSpeed(speed)
@@ -120,7 +137,34 @@ export default function RecordingPreviewModal({
               <HardDrive size={14} /> <span>{sizeMb} MB</span>
             </div>
             <div className="meta-chip">
-              <Film size={14} /> <span>MP4 (H.264)</span>
+              <Film size={14} /> <span>{formatLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Windows Playback Tip when WebM */}
+        <div
+          style={{
+            margin: '12px 0 16px',
+            padding: '12px 14px',
+            background: 'rgba(56, 189, 248, 0.08)',
+            border: '1px solid rgba(56, 189, 248, 0.22)',
+            borderRadius: 10,
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: '#bae6fd',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}
+        >
+          <Info size={16} color="#38bdf8" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <strong style={{ color: '#ffffff' }}>Universal Playback Guide:</strong> Your video contains embedded high-precision duration and seek headers.
+            <div style={{ marginTop: 4, color: '#94a3b8' }}>
+              • <strong style={{ color: '#e2e8f0' }}>Best Players on Windows:</strong> Right-click file &rarr; <em>Open With &rarr; Google Chrome, Microsoft Edge, or VLC</em>.
+              <br />
+              • <strong style={{ color: '#e2e8f0' }}>Windows Media Player 0x80070002:</strong> Caused when Windows lacks VP9 codecs. Use Chrome/Edge/VLC or install free <em>"Web Media Extensions"</em> from Microsoft Store.
             </div>
           </div>
         </div>
@@ -150,6 +194,17 @@ export default function RecordingPreviewModal({
           <button className="btn-secondary-dark btn-discard" onClick={onDiscard} disabled={isSaving}>
             <Trash2 size={16} /> Discard
           </button>
+          {previewUrl && (
+            <button
+              type="button"
+              className="btn-secondary-dark"
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => window.open(previewUrl, '_blank')}
+              title="Open video player in high-res full tab"
+            >
+              <ExternalLink size={15} /> Open in Tab
+            </button>
+          )}
           <button className="btn-primary-orange btn-save-device" onClick={onSave} disabled={isSaving}>
             <Download size={16} /> {isSaving ? 'Saving…' : 'Save to My Device'}
           </button>
